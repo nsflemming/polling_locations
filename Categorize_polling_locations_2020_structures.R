@@ -107,7 +107,7 @@ libraries$address<-str_replace_all(libraries$address, rep_str)
 allegheny<-read.csv('AlleghenyCounty_publicbldgs2023.csv')
 ### construct and trim to addresses and indicator
 allegheny$STATE<-'PA'
-allegheny<-process_struct_data(allegheny, 'address', 'city', 'STATE', 'zipcode', 'government')
+allegheny<-process_struct_data(allegheny, 'address', 'city', 'STATE', 'zipcode', 'a_public')
 ### abbreviate street names
 allegheny$address<-str_replace_all(allegheny$address, rep_str)
 
@@ -178,6 +178,7 @@ structures<-structures%>%
          school=as.numeric(str_detect(location_category, 'school')),
          firestation=as.numeric(str_detect(location_category, 'firestation')),
          policestation=as.numeric(str_detect(location_category, 'policestation')),
+         a_public=as.numeric(str_detect(location_category, 'a_public')),
          postoffice=as.numeric(str_detect(location_category, 'postoffice')),
          courthouse=as.numeric(str_detect(location_category, 'courthouse')),
          rangerstation=as.numeric(str_detect(location_category, 'rangerstation')),
@@ -197,13 +198,13 @@ polltest<-polltest%>%
   group_by(address, precinct_id)%>%
   mutate(location_count = sum(across(c(religious,school,firestation,
                                            policestation,postoffice,courthouse,
-                                           rangerstation,citytownhall))))
+                                           rangerstation,citytownhall,a_public,library))))
 #change locations with two categories to 'multiple' to check missingness
 polltest$location_category[polltest$location_count>1]<-'multiple'
 #remove individual categories and location count
 polltest<-subset(polltest, select=-c(religious,school,firestation,
                                      policestation,postoffice,courthouse,
-                                     rangerstation,citytownhall, library))
+                                     rangerstation,citytownhall,a_public,library))
 #remove duplicates 
 polltest<-unique(polltest)
 ##(still have extra rows for some reason)

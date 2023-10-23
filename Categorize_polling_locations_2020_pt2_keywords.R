@@ -5,7 +5,7 @@ library(dplyr)
 library(stringr)
 
 #read in poll locations
-setwd("C:/Users/natha/Desktop/Polling Places/data/Structures")
+setwd("C:/Users/natha/Desktop/Polling Places/data")
 poll<-read.csv('polllocation_and_structure.csv')
 
 ############################## define function 
@@ -137,6 +137,7 @@ master_index<-master_index%>%
 ## save copy of matrix
 setwd("C:/Users/natha/Desktop/Polling Places/data/Structures")
 write.csv(master_index, 'keyword_matrix.csv')
+
 ############## merge poll and keyword index
 polltest<-cbind(poll, master_index)
 #add in keyword codings conditionally
