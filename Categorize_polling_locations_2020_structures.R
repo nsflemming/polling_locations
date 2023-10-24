@@ -192,7 +192,7 @@ polltest<-left_join(poll, structures, 'address', relationship='many-to-many')
 #remove duplicates
 polltest<-unique(polltest)
 ## save a copy of structure categorization matrix
-#write.csv(polltest, 'structure_matrix.csv')
+write.csv(polltest, 'structure_matrix.csv')
 #location category count instead of location category to see what's multiple coded
 polltest<-polltest%>%
   group_by(address, precinct_id)%>%
@@ -214,7 +214,6 @@ sum(poll$address%in%structures$address)
 1-3602/9235 #60.9% missing
 ####### save to csv
 #set directory
-setwd('C:/Users/natha/Desktop/Polling Places/data')
 write.csv(polltest, 'polllocation_and_structure.csv')
 
 
