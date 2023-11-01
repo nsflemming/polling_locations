@@ -39,7 +39,7 @@ L2_mini<-subset(L2, select = c(LALVOTERID, voterLongLat))
 
 ### save to csv
 setwd("C:/Users/natha/Desktop/Polling Places/data")
-write.csv(L2_mini, 'L2_2020_coords')
+write.csv(L2_mini, 'L2_2020_coords.csv')
 
 
 
