@@ -5,6 +5,7 @@
 library(tidyverse)
 library(data.table)
 
+######################### Prepare data for arcGIS spatial join
 #read in data
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 #row1<-read.csv('PA_combined.csv', nrows = 1)
@@ -41,6 +42,7 @@ L2_mini<-subset(L2, select = c(LALVOTERID, voterLongLat))
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(L2_mini, 'L2_2020_coords.csv')
 
-
+############################ Read in joined data
+L2_join <- read.csv('vtds_L2_join.csv')
 
 
