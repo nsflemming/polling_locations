@@ -27,10 +27,14 @@ gov_struct_matrix$location_category[gov_struct_matrix$location_count>1]<-'multip
 gov_struct_mult = gov_struct_matrix[gov_struct_matrix$location_count>1,]
 ## remove missing
 gov_struct_mult<-gov_struct_mult[complete.cases(gov_struct_mult),]
-## distribution of multiple location count
+## distribution of multiple location count variable
 summary(gov_struct_mult$location_count)
 ggplot(data=gov_struct_mult, aes(x=location_count))+
   geom_histogram(bins=4)
+sum(gov_struct_mult$location_count==5)/5 # 1 5-category locations
+sum(gov_struct_mult$location_count==4)/4 # 11 4-category locations
+sum(gov_struct_mult$location_count==3)/3 # 56 3-category locations
+sum(gov_struct_mult$location_count==2)/2 # 344 2-category locations
 
 ##########  two category locations crosstab
 two_category<-gov_struct_mult[gov_struct_mult$location_count==2,]

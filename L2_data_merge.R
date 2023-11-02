@@ -25,6 +25,8 @@ L2<-fread('PA_combined.csv',
                        'CountyEthnic_Description_2020'
                                           ))
 poll<-read.csv('polllocation_structure_and_keyword.csv')
+## drop unnecessary columns
+poll <- subset(poll, select = -c(X, X.1, X.2, polling_place_id, source_notes, hold))
 
 
 ### remove obs if missing address
@@ -44,5 +46,30 @@ write.csv(L2_mini, 'L2_2020_coords.csv')
 
 ############################ Read in joined data
 L2_join <- read.csv('vtds_L2_join.csv')
+## reformat county-precinct naming in join and poll files to agree
+# convert L2 to all uppercase
+L2_join$county_pre<-toupper(L2_join$county_pre)
+# join poll county and precinct strings
+poll$county_pre = paste0(poll$county_name,' - ',poll$precinct_name)
+#verify
+poll$county_pre %in% L2_join$county_pre
 
+###
+recode_sheet <- unique(subset(L2_join, select = c(county_pre)))
+ref_sheet <- unique(subset(poll, select = c(county_name, precinct_name, precinct_id)))
+L2_test<-sample_n(L2_join, 10000)
+#get precinct name from county-pre? closest to poll naming?
+L2_test$precinct_name = str_extract_all(L2_test$county_pre, '(?<=\\-\\s).*')
+## manually match L2 precinct name to poll location precinct ids
+#L2_test<-L2_test%>%
+#  mutate(precinct_id = case_when(
+#  )
 
+  
+  
+  
+  
+  
+  
+  
+  
