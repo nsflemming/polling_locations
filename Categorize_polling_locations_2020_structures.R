@@ -107,7 +107,7 @@ libraries$address<-str_replace_all(libraries$address, rep_str)
 allegheny<-read.csv('AlleghenyCounty_publicbldgs2023.csv')
 ### construct and trim to addresses and indicator
 allegheny$STATE<-'PA'
-allegheny<-process_struct_data(allegheny, 'address', 'city', 'STATE', 'zipcode', 'a_public')
+allegheny<-process_struct_data(allegheny, 'address', 'city', 'STATE', 'zipcode', 'allegh_pub')
 ### abbreviate street names
 allegheny$address<-str_replace_all(allegheny$address, rep_str)
 
@@ -176,13 +176,13 @@ structures<-rbind(worship, education, firestations, policestations, allegheny,
 structures<-structures%>%
   mutate(religious=as.numeric(str_detect(location_category, 'religious')),
          school=as.numeric(str_detect(location_category, 'school')),
-         firestation=as.numeric(str_detect(location_category, 'firestation')),
-         policestation=as.numeric(str_detect(location_category, 'policestation')),
-         a_public=as.numeric(str_detect(location_category, 'a_public')),
+         firestation=as.numeric(str_detect(location_category, 'public')),
+         policestation=as.numeric(str_detect(location_category, 'justice')),
+         allegh_pub=as.numeric(str_detect(location_category, 'allegh_pub')),
          postoffice=as.numeric(str_detect(location_category, 'postoffice')),
-         courthouse=as.numeric(str_detect(location_category, 'courthouse')),
+         courthouse=as.numeric(str_detect(location_category, 'justice')),
          rangerstation=as.numeric(str_detect(location_category, 'rangerstation')),
-         citytownhall=as.numeric(str_detect(location_category, 'citytownhall')),
+         citytownhall=as.numeric(str_detect(location_category, 'public')),
          library=as.numeric(str_detect(location_category, 'library')))
 #remove uncategorized structures
 structures<-structures[complete.cases(structures),]
@@ -198,13 +198,13 @@ polltest<-polltest%>%
   group_by(address, precinct_id)%>%
   mutate(location_count = sum(across(c(religious,school,firestation,
                                            policestation,postoffice,courthouse,
-                                           rangerstation,citytownhall,a_public,library))))
+                                           rangerstation,citytownhall,allegh_pub,library))))
 #change locations with two categories to 'multiple' to check missingness
 polltest$location_category[polltest$location_count>1]<-'multiple'
 #remove individual categories and location count
 polltest<-subset(polltest, select=-c(religious,school,firestation,
                                      policestation,postoffice,courthouse,
-                                     rangerstation,citytownhall,a_public,library))
+                                     rangerstation,citytownhall,allegh_pub,library))
 #remove duplicates 
 polltest<-unique(polltest)
 ##(still have extra rows for some reason)

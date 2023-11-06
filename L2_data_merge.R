@@ -44,9 +44,10 @@ L2_mini<-subset(L2, select = c(LALVOTERID, voterLongLat))
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(L2_mini, 'L2_2020_coords.csv')
 
-############################ Read in joined data
+############################ Read in joined data after ArcGIS processing
+setwd("C:/Users/natha/Desktop/Polling Places/data")
 L2_join <- read.csv('vtds_L2_join.csv')
-## reformat county-precinct naming in join and poll files to agree
+#### reformat county-precinct naming in join and poll files to agree
 # convert L2 to all uppercase
 L2_join$county_pre<-toupper(L2_join$county_pre)
 # join poll county and precinct strings
@@ -54,9 +55,27 @@ poll$county_pre = paste0(poll$county_name,' - ',poll$precinct_name)
 #verify
 poll$county_pre %in% L2_join$county_pre
 
-###
+### 
 recode_sheet <- unique(subset(L2_join, select = c(county_pre)))
 ref_sheet <- unique(subset(poll, select = c(county_name, precinct_name, precinct_id)))
+## join recode and reference sheets relying on alphabetical order to match
+# alphabetize and add index row
+recode_sheet<-recode_sheet %>%
+  arrange(county_pre) %>%
+  # add index row
+  mutate(index=row.names(recode_sheet))
+ref_sheet<-ref_sheet %>%
+  # add index row
+  mutate(index=row.names(ref_sheet))
+#join on index column
+joined_sheet = left_join(recode_sheet, ref_sheet, by='index')
+#### manually correct mismatches
+# add apostrophe to prevent ids being converted to dates
+joined_sheet$precinct_id = 
+paste0('\'',joined_sheet$precinct_id)
+setwd("C:/Users/natha/Desktop/Polling Places/data")
+write.csv(joined_sheet, 'joined_sheet_mismatched.csv')
+
 L2_test<-sample_n(L2_join, 10000)
 #get precinct name from county-pre? closest to poll naming?
 L2_test$precinct_name = str_extract_all(L2_test$county_pre, '(?<=\\-\\s).*')
