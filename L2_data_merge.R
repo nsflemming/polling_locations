@@ -24,9 +24,11 @@ L2<-fread('PA_combined.csv',
                        'EthnicGroups_EthnicGroup1Desc_2020','Ethnic_Description_2020',
                        'CountyEthnic_Description_2020'
                                           ))
-poll<-read.csv('polllocation_structure_and_keyword.csv')
+#read in poll location data
+#### Voting precinct list matches 2018 polling location list better than 2020
+poll<-read.csv('Pennsylvania_2018-11-06.csv')
 ## drop unnecessary columns
-poll <- subset(poll, select = -c(X, X.1, X.2, polling_place_id, source_notes, hold))
+poll <- subset(poll, select = c(county_name, precinct_name, precinct_id))
 
 
 ### remove obs if missing address
@@ -63,12 +65,12 @@ ref_sheet <- unique(subset(poll, select = c(county_name, precinct_name, precinct
 recode_sheet<-recode_sheet %>%
   arrange(county_pre) %>%
   # add index row
-  mutate(index=row.names(recode_sheet))
+  mutate(index=1:nrow(recode_sheet))
 ref_sheet<-ref_sheet %>%
   # alphabetize on county and precinct name
   arrange(county_name,precinct_name)%>%
   # add index row
-  mutate(index=row.names(ref_sheet))
+  mutate(index=1:nrow(ref_sheet))
 #join on index column
 joined_sheet = left_join(recode_sheet, ref_sheet, by='index')
 #### manually correct mismatches
@@ -77,6 +79,8 @@ joined_sheet$precinct_id =
 paste0('\'',joined_sheet$precinct_id)
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(joined_sheet, 'joined_sheet_mismatched.csv')
+
+
 
 L2_test<-sample_n(L2_join, 10000)
 #get precinct name from county-pre? closest to poll naming?
