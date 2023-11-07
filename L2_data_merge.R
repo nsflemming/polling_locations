@@ -65,6 +65,8 @@ recode_sheet<-recode_sheet %>%
   # add index row
   mutate(index=row.names(recode_sheet))
 ref_sheet<-ref_sheet %>%
+  # alphabetize on county and precinct name
+  arrange(county_name,precinct_name)%>%
   # add index row
   mutate(index=row.names(ref_sheet))
 #join on index column
