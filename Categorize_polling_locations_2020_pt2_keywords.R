@@ -185,11 +185,11 @@ master_index<-as.data.frame(cbind(lib_indx, gov_fire_indx, cent_indx, relig_indx
                                   milit_indx,union_indx,othr_indx))
 # create new category for locations with multiple keywords
 master_index<-master_index%>%
-  mutate(hold = rowSums(across(c(lib_indx, gov_fire_indx, cent_indx, relig_indx, 
+  mutate(keyword_count = rowSums(across(c(lib_indx, gov_fire_indx, cent_indx, relig_indx, 
                                  schl_indx, apt_indx,club_indx, 
                                  vet_indx, sen_indx,assc_indx,sport_indx,
                                  milit_indx,union_indx,othr_indx)))) %>%
-  mutate(mult_indx = case_when(hold == 0 ~ 0, hold == 1 ~ 0,
+  mutate(mult_indx = case_when(keyword_count == 0 ~ 0, keyword_count == 1 ~ 0,
                                .default = 1))
 ## save copy of matrix
 setwd("C:/Users/natha/Desktop/Polling Places/data/Structures")

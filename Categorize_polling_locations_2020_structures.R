@@ -85,14 +85,14 @@ education <-
 ## fire stations
 firestations<-read.csv('Fire_Stations_HIFLD.csv')
 ### construct and trim to addresses and indicator
-firestations<-process_struct_data(firestations, 'ADDRESS', 'CITY', 'STATE', 'ZIPCODE', 'firestation')
+firestations<-process_struct_data(firestations, 'ADDRESS', 'CITY', 'STATE', 'ZIPCODE', 'public')
 ### abbreviate street names
 firestations$address<-str_replace_all(firestations$address, rep_str)
 
 ## law enforcement
 policestations<-read.csv('Law_Enforcement_Structures_NGDA_2023/Police_Stations_0.csv')
 ### construct and trim to addresses and indicator
-policestations<-process_struct_data(policestations, 'ADDRESS', 'CITY', 'STATE', 'ZIPCODE', 'policestation')
+policestations<-process_struct_data(policestations, 'ADDRESS', 'CITY', 'STATE', 'ZIPCODE', 'justice')
 ### abbreviate street names
 policestations$address<-str_replace_all(policestations$address, rep_str)
 
@@ -160,8 +160,8 @@ nat_map2$fcode<-nat_map$fcode
 nat_map2$ftype<-nat_map$ftype
 ## code buildings
 location.type <- c(school=730)
-location.code <- c(firestation=74026, policestation=74034, postoffice=78006,
-                   courthouse=83011, rangerstation=83033, citytownhall=83044)
+location.code <- c(public=74026, justice=74034, postoffice=78006,
+                   justice=83011, rangerstation=83033, public=83044)
 nat_map2$location_category <- names(location.type)[match(nat_map2$ftype, location.type)]
 nat_map2$location_category <- names(location.code)[match(nat_map2$fcode, location.code)]
 ## drop ftype and fcode
@@ -176,13 +176,11 @@ structures<-rbind(worship, education, firestations, policestations, allegheny,
 structures<-structures%>%
   mutate(religious=as.numeric(str_detect(location_category, 'religious')),
          school=as.numeric(str_detect(location_category, 'school')),
-         firestation=as.numeric(str_detect(location_category, 'public')),
-         policestation=as.numeric(str_detect(location_category, 'justice')),
+         public=as.numeric(str_detect(location_category, 'public')),
+         justice=as.numeric(str_detect(location_category, 'justice')),
          allegh_pub=as.numeric(str_detect(location_category, 'allegh_pub')),
          postoffice=as.numeric(str_detect(location_category, 'postoffice')),
-         courthouse=as.numeric(str_detect(location_category, 'justice')),
          rangerstation=as.numeric(str_detect(location_category, 'rangerstation')),
-         citytownhall=as.numeric(str_detect(location_category, 'public')),
          library=as.numeric(str_detect(location_category, 'library')))
 #remove uncategorized structures
 structures<-structures[complete.cases(structures),]
@@ -196,24 +194,24 @@ write.csv(polltest, 'structure_matrix.csv')
 #location category count instead of location category to see what's multiple coded
 polltest<-polltest%>%
   group_by(address, precinct_id)%>%
-  mutate(location_count = sum(across(c(religious,school,firestation,
-                                           policestation,postoffice,courthouse,
-                                           rangerstation,citytownhall,allegh_pub,library))))
+  mutate(location_count = sum(across(c(religious,school,public,
+                                           justice,postoffice,
+                                           rangerstation,allegh_pub,library))))
 #change locations with two categories to 'multiple' to check missingness
 polltest$location_category[polltest$location_count>1]<-'multiple'
 #remove individual categories and location count
-polltest<-subset(polltest, select=-c(religious,school,firestation,
-                                     policestation,postoffice,courthouse,
-                                     rangerstation,citytownhall,allegh_pub,library))
+polltest<-subset(polltest, select=-c(religious,school,public,
+                                     justice,postoffice,
+                                     rangerstation,allegh_pub,library))
 #remove duplicates 
 polltest<-unique(polltest)
 ##(still have extra rows for some reason)
 
 #calc missingness by checking which addresses are in structure list
-sum(poll$address%in%structures$address)
-1-3602/9235 #60.9% missing
+1-(sum(poll$address%in%structures$address)/9235) #60.9% missing
 ####### save to csv
 #set directory
+setwd('C:/Users/natha/Desktop/Polling Places/data')
 write.csv(polltest, 'polllocation_and_structure.csv')
 
 

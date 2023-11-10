@@ -19,33 +19,56 @@ poll_coded<-subset(poll_coded, select = -c(X, X.1, polling_place_id, source_note
 poll_coded<-poll_coded%>%
   mutate(keyword_category = case_when(mult_indx==1 ~ 'multiple',
                                        lib_indx==1 ~ 'library',
-                                       gov_indx==1 ~ 'citytownhall',
+                                       gov_fire_indx==1 ~ 'public',
                                        cent_indx==1 ~ 'reccenter',
                                        relig_indx==1 ~ 'religious',
                                        schl_indx==1 ~ 'school',
                                        apt_indx==1 ~ 'apartment',
                                        club_indx==1 ~ 'club',
-                                       fire_indx==1 ~ 'firestation',
-                                       vet_indx==1~ 'veteran',
+                                       vet_indx==1 ~ 'veteran',
                                        sen_indx==1 ~ 'senior',
-                                       .default = location_category)) %>%
+                                       assc_indx==1 ~ 'association',
+                                       sport_indx==1 ~ 'sport',
+                                       milit_indx==1 ~ 'military',
+                                       union_indx==1 ~ 'union',
+                                       othr_indx==1 ~ 'other',
+                                       .default = NA)) %>%
   #remove columns
-  select(!c(mult_indx,lib_indx,gov_indx,cent_indx,relig_indx,schl_indx,apt_indx,
-            club_indx,fire_indx,vet_indx,sen_indx))
+  select(!c(mult_indx,lib_indx,gov_fire_indx,cent_indx,relig_indx,schl_indx,apt_indx,
+            club_indx,vet_indx,sen_indx,assc_indx,sport_indx,
+            milit_indx,union_indx,othr_indx, X))
 
 ############## Examine number of times location and keyword category match
 ## Tally matches
 sum(poll_coded$location_category==poll_coded$keyword_category, na.rm=T)
-#2935
+#2760
 #  Tally disagreements
 sum(poll_coded$location_category!=poll_coded$keyword_category, na.rm=T)
-#667
+#729
 
 ##### subset out disagreements
 disagree <- poll_coded[poll_coded$location_category!=poll_coded$keyword_category,]
 disagree <- disagree[complete.cases(disagree),]
 
-##### 
+##### merge two codings and create histogram?
+disagree$compound = paste0(disagree$location_category, ' & ', disagree$keyword_category)
+temp <- data.frame(unique(disagree$compound))
+
+## make order agnostic?
+disagree<-disagree%>%
+  mutate(compound = case_when(
+    compound == "multiple & public" ~ "public & multiple",
+    compound == "religious & multiple" ~ "multiple & religious",
+    compound == "multiple & library" ~ "library & multiple",
+    compound == "school & multiple" ~ "multiple & school",
+    compound == "public & library" ~ "library & public",
+    compound == "school & public" ~ "public & school",
+    .default = compound
+  ))
+#plot compound categories
+ggplot(data=disagree, aes(x=compound))+
+  geom_histogram(stat='count')+
+  scale_x_discrete(guide = guide_axis(angle = 45))
 
 
 
