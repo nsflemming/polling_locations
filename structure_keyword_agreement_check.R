@@ -69,6 +69,8 @@ disagree<-disagree%>%
 ggplot(data=disagree, aes(x=compound))+
   geom_histogram(stat='count')+
   scale_x_discrete(guide = guide_axis(angle = 45))
+#counts for categories
+summary(as.factor(disagree$compound))
 
 
 

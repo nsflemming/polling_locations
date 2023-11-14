@@ -8,21 +8,21 @@ library(data.table)
 ######################### Prepare data for arcGIS spatial join
 #read in data
 setwd("C:/Users/natha/Desktop/Polling Places/data")
-#row1<-read.csv('PA_combined.csv', nrows = 1)
+row1<-read.csv('PA_combined.csv', nrows = 1)
 L2<-fread('PA_combined.csv', 
             select = c('LALVOTERID',
-                       'Residence_Addresses_AddressLine_2020','Residence_Addresses_ExtraAddressLine_2020',
-                       'Residence_Addresses_City_2020','Residence_Addresses_State_2020',
-                       'Residence_Addresses_Zip_2020',
-                       'Residence_Addresses_Latitude_2020','Residence_Addresses_Longitude_2020',
-                       'Voters_Gender_2020','Voters_Age_2020','Parties_Description_2020',
-                       'Religions_Description_2020','Voters_OfficialRegDate_2020',
-                       'MaritalStatus_Description_2020','CommercialData_PresenceOfChildrenCode_2020',
-                       'CommercialData_EstimatedHHIncomeAmount_2020',
-                       'CommercialData_Education_2020','County_2020','Voters_FIPS_2020',
-                       'Voters_Active_2020','CountyEthnic_LALEthnicCode_2020',
-                       'EthnicGroups_EthnicGroup1Desc_2020','Ethnic_Description_2020',
-                       'CountyEthnic_Description_2020'
+                       'Residence_Addresses_AddressLine_2018','Residence_Addresses_ExtraAddressLine_2018',
+                       'Residence_Addresses_City_2018','Residence_Addresses_State_2018',
+                       'Residence_Addresses_Zip_2018',
+                       'Residence_Addresses_Latitude_2018','Residence_Addresses_Longitude_2018',
+                       'Voters_Gender_2018','Voters_Age_2018','Parties_Description_2018',
+                       'Religions_Description_2018','Voters_OfficialRegDate_2018',
+                       'MaritalStatus_Description_2018','CommercialData_PresenceOfChildrenCode_2018',
+                       'CommercialData_EstimatedHHIncomeAmount_2018',
+                       'CommercialData_Education_2018','County_2018','Voters_FIPS_2018',
+                       'Voters_Active_2018','CountyEthnic_LALEthnicCode_2018',
+                       'EthnicGroups_EthnicGroup1Desc_2018','Ethnic_Description_2018',
+                       'CountyEthnic_Description_2018'
                                           ))
 #read in poll location data
 #### Voting precinct list matches 2018 polling location list better than 2020
@@ -33,10 +33,10 @@ poll <- subset(poll, select = c(county_name, precinct_name, precinct_id))
 
 ### remove obs if missing address
 L2 <- L2 %>%
-  drop_na(Residence_Addresses_AddressLine_2020)
+  drop_na(Residence_Addresses_AddressLine_2018)
 
 ###combine voter coordinates into one so arcGIS can split it
-L2$voterLongLat<-paste0(L2$Residence_Addresses_Latitude_2020,',',L2$Residence_Addresses_Longitude_2020)
+L2$voterLongLat<-paste0(L2$Residence_Addresses_Latitude_2018,',',L2$Residence_Addresses_Longitude_2018)
 L2$voterLongLat<-str_remove(L2$voterLongLat, " , ")
 
 ### get just id and coordinates
@@ -44,18 +44,18 @@ L2_mini<-subset(L2, select = c(LALVOTERID, voterLongLat))
 
 ### save to csv
 setwd("C:/Users/natha/Desktop/Polling Places/data")
-write.csv(L2_mini, 'L2_2020_coords.csv')
+write.csv(L2_mini, 'L2_2018_coords.csv')
 
 ############################ Read in joined data after ArcGIS processing
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 L2_join <- read.csv('vtds_L2_join.csv')
-#### reformat county-precinct naming in join and poll files to agree
+#### reformat county-precinct naming in join and poll files to match better
 # convert L2 to all uppercase
 L2_join$county_pre<-toupper(L2_join$county_pre)
 # join poll county and precinct strings
-poll$county_pre = paste0(poll$county_name,' - ',poll$precinct_name)
-#verify
-poll$county_pre %in% L2_join$county_pre
+#poll$county_pre = paste0(poll$county_name,' - ',poll$precinct_name)
+##verify
+#poll$county_pre %in% L2_join$county_pre
 
 ### 
 recode_sheet <- unique(subset(L2_join, select = c(county_pre)))
@@ -75,26 +75,41 @@ ref_sheet<-ref_sheet %>%
 joined_sheet = left_join(recode_sheet, ref_sheet, by='index')
 #### manually correct mismatches
 # add apostrophe to prevent ids being converted to dates
-joined_sheet$precinct_id = 
-paste0('\'',joined_sheet$precinct_id)
+joined_sheet$precinct_id = paste0('\'',joined_sheet$precinct_id)
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(joined_sheet, 'joined_sheet_mismatched.csv')
-
-
-
-L2_test<-sample_n(L2_join, 10000)
-#get precinct name from county-pre? closest to poll naming?
-L2_test$precinct_name = str_extract_all(L2_test$county_pre, '(?<=\\-\\s).*')
 ## manually match L2 precinct name to poll location precinct ids
-#L2_test<-L2_test%>%
-#  mutate(precinct_id = case_when(
-#  )
 
-  
-  
-  
-  
-  
-  
-  
+
+### Read manually matched L2 and poll location precinct names back in
+joined_sheet_matched<-read.csv('joined_sheet_matched.csv')
+#remove the apostrophe from the precinct ids
+joined_sheet_matched$precinct_id = str_extract(joined_sheet_matched$precinct_id,
+                                               "(?<=\\')(.*)")
+# find number of unmatched precincts
+9235-sum(complete.cases(joined_sheet_matched))
+#percentage
+(9235-sum(complete.cases(joined_sheet_matched)))/9235
+#2%-ish
+#subset out unmatched precincts
+joined_sheet_unmatched<-joined_sheet_matched[!complete.cases(joined_sheet_matched),]
+######### unmatched precincts seem to be mainly due to mixing up 2018 and 2020
+# write to csv
+setwd("C:/Users/natha/Desktop/Polling Places/data")
+write.csv(joined_sheet_unmatched, 'joined_sheet_unmatched.csv')
+
+
+################# merge L2 data with matched precincts
+## merge L2 with joined_sheet on L2 precinct names
+joined_sheet_matched<-subset(joined_sheet_matched, select = c(county_pre, county_name,
+                                                              precinct_name,precinct_id))
+L2_join<-left_join(L2_join, joined_sheet_matched, by='county_pre')
+# find number of unmatched L2 voters
+8104701-sum(complete.cases(L2_join))
+#percentage
+(8104701-sum(complete.cases(L2_join)))/8104701
+#1.5%-ish
+# write to csv
+setwd("C:/Users/natha/Desktop/Polling Places/data")
+write.csv(joined_sheet_unmatched, 'L2_join_poll_place.csv')  
   
