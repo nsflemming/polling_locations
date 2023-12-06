@@ -3,7 +3,7 @@
 
 # Merge L2 data to polling locations
 library(tidyverse)
-library(data.table)
+library(data.table) #read in L2 data selectively
 
 ######################### Prepare data for arcGIS spatial join
 #read in data
@@ -11,19 +11,9 @@ setwd("C:/Users/natha/Desktop/Polling Places/data")
 row1<-read.csv('PA_combined.csv', nrows = 1)
 L2<-fread('PA_combined.csv', 
             select = c('LALVOTERID',
-                       'Residence_Addresses_AddressLine_2018','Residence_Addresses_ExtraAddressLine_2018',
-                       'Residence_Addresses_City_2018','Residence_Addresses_State_2018',
-                       'Residence_Addresses_Zip_2018',
-                       'Residence_Addresses_Latitude_2018','Residence_Addresses_Longitude_2018',
-                       'Voters_Gender_2018','Voters_Age_2018','Parties_Description_2018',
-                       'Religions_Description_2018','Voters_OfficialRegDate_2018',
-                       'MaritalStatus_Description_2018','CommercialData_PresenceOfChildrenCode_2018',
-                       'CommercialData_EstimatedHHIncomeAmount_2018',
-                       'CommercialData_Education_2018','County_2018','Voters_FIPS_2018',
-                       'Voters_Active_2018','CountyEthnic_LALEthnicCode_2018',
-                       'EthnicGroups_EthnicGroup1Desc_2018','Ethnic_Description_2018',
-                       'CountyEthnic_Description_2018'
-                                          ))
+                       'Residence_Addresses_AddressLine_2018',
+                       'Residence_Addresses_Latitude_2018',
+                       'Residence_Addresses_Longitude_2018'))
 #read in poll location data
 #### Voting precinct list matches 2018 polling location list better than 2020
 poll<-read.csv('Pennsylvania_2018-11-06.csv')
@@ -49,6 +39,23 @@ write.csv(L2_mini, 'L2_2018_coords.csv')
 ############################ Read in joined data after ArcGIS processing
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 L2_join <- read.csv('vtds_L2_join.csv')
+#### merge L2 demographic data back in
+L2_demog<-fread('PA_combined.csv', 
+          select = c('LALVOTERID',
+                     'Residence_Addresses_AddressLine_2018','Residence_Addresses_ExtraAddressLine_2018',
+                     'Residence_Addresses_City_2018','Residence_Addresses_State_2018',
+                     'Residence_Addresses_Zip_2018',
+                     'Residence_Addresses_Latitude_2018','Residence_Addresses_Longitude_2018',
+                     'Voters_Gender_2018','Voters_Age_2018','Parties_Description_2018',
+                     'Religions_Description_2018','Voters_OfficialRegDate_2018',
+                     'MaritalStatus_Description_2018','CommercialData_PresenceOfChildrenCode_2018',
+                     'CommercialData_EstimatedHHIncomeAmount_2018',
+                     'CommercialData_Education_2018','County_2018','Voters_FIPS_2018',
+                     'Voters_Active_2018','CountyEthnic_LALEthnicCode_2018',
+                     'EthnicGroups_EthnicGroup1Desc_2018','Ethnic_Description_2018',
+                     'CountyEthnic_Description_2018'
+          ))
+L2_join <- left_join(L2_join, L2_demog, by='LALVOTERID')
 #### reformat county-precinct naming in join and poll files to match better
 # convert L2 to all uppercase
 L2_join$county_pre<-toupper(L2_join$county_pre)
@@ -111,5 +118,5 @@ L2_join<-left_join(L2_join, joined_sheet_matched, by='county_pre')
 #1.5%-ish
 # write to csv
 setwd("C:/Users/natha/Desktop/Polling Places/data")
-write.csv(joined_sheet_unmatched, 'L2_join_poll_place.csv')  
+write.csv(L2_join, 'L2_join_poll_place.csv')  
   
