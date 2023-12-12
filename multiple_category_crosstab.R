@@ -16,9 +16,9 @@ poll<-read.csv('polllocation_and_structure.csv') #poll + structure condensed
 #location category count instead of location category to see what's multiple coded
 gov_struct_matrix<-gov_struct_matrix%>%
   group_by(address, precinct_id)%>%
-  mutate(location_count = sum(across(c(religious,school,firestation,
-                                       policestation,postoffice,courthouse,
-                                       rangerstation,citytownhall,a_public,library)))) %>%
+  mutate(location_count = sum(across(c(religious,school,public,
+                                       justice,postoffice,
+                                       rangerstation,allegh_pub,library)))) %>%
   ungroup()%>%
   select(!c(polling_place_id, source_notes))
 #change locations with two categories to 'multiple' to check missingness
@@ -44,13 +44,11 @@ two_category<-two_category%>%
   #group_by(address, precinct_id)%>%
   mutate(category_1 = case_when(religious==1 ~ 'religious',
                                 school==1 ~ 'school',
-                                firestation==1 ~ 'firestation',
-                                policestation==1 ~ 'policestation',
-                                a_public==1 ~ 'a_public',
+                                public==1 ~ 'public',
+                                allegh_pub==1 ~ 'allegh_pub',
                                 postoffice==1 ~ 'postoffice',
-                                courthouse==1 ~ 'courthouse',
+                                justice==1 ~ 'justice',
                                 rangerstation==1 ~ 'rangerstation',
-                                citytownhall==1 ~ 'citytownhall',
                                 library==1 ~ 'library',
                                 .default = location_category))
 
@@ -75,13 +73,11 @@ three_category<-three_category%>%
   #group_by(address, precinct_id)%>%
   mutate(category_1 = case_when(religious==1 ~ 'religious',
                                 school==1 ~ 'school',
-                                firestation==1 ~ 'firestation',
-                                policestation==1 ~ 'policestation',
-                                a_public==1 ~ 'a_public',
+                                public==1 ~ 'public',
+                                allegh_pub==1 ~ 'allegh_pub',
                                 postoffice==1 ~ 'postoffice',
-                                courthouse==1 ~ 'courthouse',
+                                justice==1 ~ 'justice',
                                 rangerstation==1 ~ 'rangerstation',
-                                citytownhall==1 ~ 'citytownhall',
                                 library==1 ~ 'library',
                                 .default = location_category))
 
