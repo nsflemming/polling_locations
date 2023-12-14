@@ -40,7 +40,7 @@ process_nat_map_data<-function(df, street_var, city_var, state_var, zip_var, str
 }
 
 ##read in polling locations
-poll<-read.csv('polllocation2020.csv')
+poll<-read.csv('polllocation2018.csv')
 ###remove old categorization
 poll<-subset(poll, select=-c(location_category))
 ### abbreviate street names

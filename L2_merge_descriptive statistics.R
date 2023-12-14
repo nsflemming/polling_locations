@@ -81,6 +81,16 @@ temp <- miss_by_county(L2_missing, `CommercialData_Education_2018`) %>%
 missingness <- left_join(missingness, temp, by='county')
 missingness$prop_miss_educ<-missingness$sum_educ_na/missingness$reg_voter_pop
 
+### Missingness of children
+#convert blanks to missing?
+L2_missing<-factor_and_fill(L2_missing, 'CommercialData_PresenceOfChildrenCode_2018',NA)
+# count missing by county
+temp <- miss_by_county(L2_missing, `CommercialData_PresenceOfChildrenCode_2018`) %>%
+  rename(sum_child_na = n)
+# merge into missingness dataframe and calculate proportion
+missingness <- left_join(missingness, temp, by='county')
+missingness$prop_miss_child<-missingness$sum_child_na/missingness$reg_voter_pop
+
 #### save to csv
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(missingness, 'missingness_by_county.csv')

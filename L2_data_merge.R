@@ -120,9 +120,14 @@ L2_join<-left_join(L2_join, joined_sheet_matched, by='county_pre')
 ################# merge in polling place categories
 # location/category data
 setwd("C:/Users/natha/Desktop/Polling Places/data")
-poll_cat<-read.csv('polllocation_and_structure.csv') #poll + structure condensed
-L2_join <- left_join(L2_join, poll_cat, by='')
-
+poll_cat<-read.csv('polllocation_and_structure.csv')
+L2_join <- left_join(L2_join, poll_cat, by='precinct_name')
+#sample = L2_join[sample(nrow(L2_join), 1000), ]
+#drop duplicated and unneeded columns
+## (should drop more depending on use case)
+L2_join <- L2_join %>% select(-contains(".x"))
+L2_join <- L2_join %>% select(-c(location_count, source_notes, notes, source_date,
+                                 location_type, polling_place_id, X, X.1))
 
 ################# write to csv
 setwd("C:/Users/natha/Desktop/Polling Places/data")
