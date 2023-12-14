@@ -116,7 +116,15 @@ L2_join<-left_join(L2_join, joined_sheet_matched, by='county_pre')
 #percentage
 (8104701-sum(complete.cases(L2_join)))/8104701
 #1.5%-ish
-# write to csv
+
+################# merge in polling place categories
+# location/category data
+setwd("C:/Users/natha/Desktop/Polling Places/data")
+poll_cat<-read.csv('polllocation_and_structure.csv') #poll + structure condensed
+L2_join <- left_join(L2_join, poll_cat, by='')
+
+
+################# write to csv
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(L2_join, 'L2_join_poll_place.csv')  
   
