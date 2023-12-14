@@ -26,14 +26,15 @@ factor_and_fill<-function(df, var, fill){
   levels(df[[var]])[levels(df[[var]]) == ""] <- fill
   return(df)
 }
-#count missing obs by country
-miss_by_county<-function(df, var, new_var){
+#count missing observations of a variuable by country
+miss_by_county<-function(df, var){
+  # dealing with how dplyr wants variable names
   var <- enquo(var)
   temp<-df %>% 
     group_by(county) %>% 
-    mutate(new_var = sum(is.na(!!var)))%>%
+    mutate(n = sum(is.na(!!var)))%>%
     ungroup()%>%
-    select(county,new_var)%>%
+    select(county,n)%>%
     distinct()
   return(temp)
 }
@@ -44,7 +45,7 @@ L2_missing$county <- factor(L2_missing$county)
 missingness<-count(L2_missing, county)
 ## normalize by number of registered voters in each county
 missingness$reg_voter_pop<-count(L2, county)$n
-missingness$prop_miss<-missingness$n/missingness$reg_voter_pop
+missingness$prop_miss_any<-missingness$n/missingness$reg_voter_pop
 #rename column
 missingness <- missingness%>%
   rename(sum_any_na=n)
@@ -53,47 +54,29 @@ missingness <- missingness%>%
 L2_missing<-factor_and_fill(L2_missing, 'Religions_Description_2018', 
                             'Not specified')
 # count missing by county
-temp <- miss_by_county(L2_missing, `Religions_Description_2018`, sum_relig_na)
-temp<-L2_missing %>% 
-  group_by(county) %>% 
-  mutate(sum_relig_na = sum(is.na(Religions_Description_2018)))%>%
-  ungroup()%>%
-  select(county,sum_relig_na)%>%
-  distinct()
+temp <- miss_by_county(L2_missing, `Religions_Description_2018`) %>%
+  #can't get rename working within the function, so doing it outside
+  rename(sum_relig_na = n)
 # merge into missingness dataframe and calculate proportion
 missingness <- left_join(missingness, temp, by='county')
 missingness$prop_miss_relig<-missingness$sum_relig_na/missingness$reg_voter_pop
 
 ### Missingness of ethnic group
-L2_missing$EthnicGroups_EthnicGroup1Desc_2018 <- 
-  factor(L2_missing$EthnicGroups_EthnicGroup1Desc_2018)
 #convert blanks to missing
-levels(L2_missing$EthnicGroups_EthnicGroup1Desc_2018)[levels(L2_missing$EthnicGroups_EthnicGroup1Desc_2018) == ""] <- 
-  NA
+L2_missing<-factor_and_fill(L2_missing, 'EthnicGroups_EthnicGroup1Desc_2018',NA)
 # count missing by county
-temp<-L2_missing %>% 
-  group_by(county) %>% 
-  mutate(sum_ethnic_na = sum(is.na(EthnicGroups_EthnicGroup1Desc_2018)))%>%
-  ungroup()%>%
-  select(county,sum_ethnic_na)%>%
-  distinct()
+temp <- miss_by_county(L2_missing, `EthnicGroups_EthnicGroup1Desc_2018`) %>%
+  rename(sum_ethnic_na = n)
 # merge into missingness dataframe and calculate proportion
 missingness <- left_join(missingness, temp, by='county')
 missingness$prop_miss_ethnic<-missingness$sum_ethnic_na/missingness$reg_voter_pop
 
 ### Missingness of education
-L2_missing$CommercialData_Education_2018 <- 
-  factor(L2_missing$CommercialData_Education_2018)
 #convert blanks to missing?
-levels(L2_missing$CommercialData_Education_2018)[levels(L2_missing$CommercialData_Education_2018) == ""] <- 
-  NA
+L2_missing<-factor_and_fill(L2_missing, 'CommercialData_Education_2018',NA)
 # count missing by county
-temp<-L2_missing %>% 
-  group_by(county) %>% 
-  mutate(sum_educ_na = sum(is.na(CommercialData_Education_2018)))%>%
-  ungroup()%>%
-  select(county,sum_educ_na)%>%
-  distinct()
+temp <- miss_by_county(L2_missing, `CommercialData_Education_2018`) %>%
+  rename(sum_educ_na = n)
 # merge into missingness dataframe and calculate proportion
 missingness <- left_join(missingness, temp, by='county')
 missingness$prop_miss_educ<-missingness$sum_educ_na/missingness$reg_voter_pop
