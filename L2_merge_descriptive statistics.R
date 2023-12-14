@@ -82,9 +82,11 @@ missingness <- left_join(missingness, temp, by='county')
 missingness$prop_miss_educ<-missingness$sum_educ_na/missingness$reg_voter_pop
 
 #### save to csv
+setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(missingness, 'missingness_by_county.csv')
 
-##### Cross tabs of demographic characteristics and polling place categories
+######### Cross tabs of demographic characteristics and polling place categories
+### Ethnic group and justice locations
 
 
 
