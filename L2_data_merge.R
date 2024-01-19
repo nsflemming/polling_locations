@@ -51,6 +51,7 @@ L2_demog<-fread('PA_combined.csv',
                      'Voters_Gender_2018','Voters_Age_2018','Parties_Description_2018',
                      'Religions_Description_2018','Voters_OfficialRegDate_2018',
                      'MaritalStatus_Description_2018','CommercialData_PresenceOfChildrenCode_2018',
+                     'CommercialData_HHComposition',
                      'CommercialData_EstimatedHHIncomeAmount_2018',
                      'CommercialData_Education_2018','County_2018','Voters_FIPS_2018',
                      'Voters_Active_2018','CountyEthnic_LALEthnicCode_2018',
@@ -67,7 +68,7 @@ L2_join$county_pre<-toupper(L2_join$county_pre)
 ##verify
 #poll$county_pre %in% L2_join$county_pre
 
-### 
+############################################### Create sheet for manual matching
 recode_sheet <- unique(subset(L2_join, select = c(county_pre)))
 ref_sheet <- unique(subset(poll, select = c(county_name, precinct_name, precinct_id)))
 ## join recode and reference sheets relying on alphabetical order to match
@@ -124,13 +125,10 @@ L2_join<-left_join(L2_join, joined_sheet_matched, by='county_pre')
 ################# merge in polling place categories
 # location/category data
 setwd("C:/Users/natha/Desktop/Polling Places/data")
-poll_cat<-read.csv('polllocation_and_structure.csv')
+poll_cat<-read.csv('polllocation_structure_and_keyword.csv')
 ## remove unneeded columns
 poll_cat <- subset(poll_cat, select = c(county_name, precinct_name, location_category))
-test <- left_join(L2_join, poll_cat, by=c('county_name', 'precinct_name'))
-#drop duplicated rows
-test<-test%>%
-  distinct()
+L2_join <- left_join(L2_join, poll_cat, by=c('county_name', 'precinct_name'))
 #sample = L2_join[sample(nrow(L2_join), 1000), ]
 #drop duplicated and unneeded columns
 ## (should drop more depending on use case)

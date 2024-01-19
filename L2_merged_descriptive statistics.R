@@ -4,6 +4,7 @@
 # Descriptive statistics
 library(tidyverse)
 library(data.table) #read in data selectively
+library(openxlsx) #save crosstabs as excel sheet
 
 # read in data
 setwd("C:/Users/natha/Desktop/Polling Places/data")
@@ -26,7 +27,7 @@ factor_and_fill<-function(df, var, fill){
   levels(df[[var]])[levels(df[[var]]) == ""] <- fill
   return(df)
 }
-#count missing observations of a variuable by country
+#count missing observations of a variable by country
 miss_by_county<-function(df, var){
   # dealing with how dplyr wants variable names
   var <- enquo(var)
@@ -39,7 +40,7 @@ miss_by_county<-function(df, var){
   return(temp)
 }
 
-
+################################################################## Missing data
 ##### any missingness by county
 L2_missing$county <- factor(L2_missing$county)
 missingness<-count(L2_missing, county)
@@ -96,9 +97,26 @@ setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(missingness, 'missingness_by_county.csv')
 
 ######### Cross tabs of demographic characteristics and polling place categories
-### Ethnic group and justice locations
+### Ethnic group and polling location categories
+################ Create crosstab
+two_cat_crosstab<-table(L2$EthnicGroups_EthnicGroup1Desc_2018, L2$location_category)
+two_cat_crosstab
+setwd("C:/Users/natha/Desktop/Polling Places/data/Crosstabs")
+openxlsx::write.xlsx(two_cat_crosstab, file='ethnic_loc_cat_crosstab.xlsx')
 
+####### Presence of child
+two_cat_crosstab<-table(L2$CommercialData_PresenceOfChildrenCode_2018, L2$location_category)
+two_cat_crosstab
+setwd("C:/Users/natha/Desktop/Polling Places/data/Crosstabs")
+openxlsx::write.xlsx(two_cat_crosstab, file='child_loc_cat_crosstab.xlsx')
 
+####### Education
+two_cat_crosstab<-table(L2$CommercialData_Education_2018, L2$location_category)
+two_cat_crosstab
+setwd("C:/Users/natha/Desktop/Polling Places/data/Crosstabs")
+openxlsx::write.xlsx(two_cat_crosstab, file='educ_loc_cat_crosstab.xlsx')
+
+####### occupation
 
 
 
