@@ -36,6 +36,8 @@ L2_mini<-subset(L2, select = c(LALVOTERID, voterLongLat))
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(L2_mini, 'L2_2018_coords.csv')
 
+############################ Export and process in ArcGIS
+
 ############################ Read in joined data after ArcGIS processing
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 L2_join <- read.csv('vtds_L2_join.csv')
@@ -56,6 +58,7 @@ L2_demog<-fread('PA_combined.csv',
                      'CountyEthnic_Description_2018'
           ))
 L2_join <- left_join(L2_join, L2_demog, by='LALVOTERID')
+rm(L2_demog)
 #### reformat county-precinct naming in join and poll files to match better
 # convert L2 to all uppercase
 L2_join$county_pre<-toupper(L2_join$county_pre)
@@ -85,10 +88,11 @@ joined_sheet = left_join(recode_sheet, ref_sheet, by='index')
 joined_sheet$precinct_id = paste0('\'',joined_sheet$precinct_id)
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 write.csv(joined_sheet, 'joined_sheet_mismatched.csv')
-## manually match L2 precinct name to poll location precinct ids
+
+################## Manually match L2 precinct name to poll location precinct ids
 
 
-### Read manually matched L2 and poll location precinct names back in
+############## Read manually matched L2 and poll location precinct names back in
 joined_sheet_matched<-read.csv('joined_sheet_matched.csv')
 #remove the apostrophe from the precinct ids
 joined_sheet_matched$precinct_id = str_extract(joined_sheet_matched$precinct_id,
@@ -121,13 +125,18 @@ L2_join<-left_join(L2_join, joined_sheet_matched, by='county_pre')
 # location/category data
 setwd("C:/Users/natha/Desktop/Polling Places/data")
 poll_cat<-read.csv('polllocation_and_structure.csv')
-L2_join <- left_join(L2_join, poll_cat, by='precinct_name')
+## remove unneeded columns
+poll_cat <- subset(poll_cat, select = c(county_name, precinct_name, location_category))
+test <- left_join(L2_join, poll_cat, by=c('county_name', 'precinct_name'))
+#drop duplicated rows
+test<-test%>%
+  distinct()
 #sample = L2_join[sample(nrow(L2_join), 1000), ]
 #drop duplicated and unneeded columns
 ## (should drop more depending on use case)
-L2_join <- L2_join %>% select(-contains(".x"))
-L2_join <- L2_join %>% select(-c(location_count, source_notes, notes, source_date,
-                                 location_type, polling_place_id, X, X.1))
+#L2_join <- L2_join %>% select(-contains(".x"))
+#L2_join <- L2_join %>% select(-c(location_count, source_notes, notes, source_date,
+#                                 location_type, polling_place_id, X, X.1))
 
 ################# write to csv
 setwd("C:/Users/natha/Desktop/Polling Places/data")
