@@ -18,25 +18,26 @@ L2_mini <- L2[sample(nrow(L2), 1000),]
 
 
 ### merge with L2 records based on name, address, gender
-## change names to all uppercase
+## change strings to all uppercase
 L2_mini$Voters_FirstName_2018<-toupper(L2_mini$Voters_FirstName_2018)
 L2_mini$Voters_MiddleName_2018<-toupper(L2_mini$Voters_MiddleName_2018)
 L2_mini$Voters_LastName_2018<-toupper(L2_mini$Voters_LastName_2018)
+L2_mini$Residence_Addresses_AddressLine_2018<-toupper(L2_mini$Residence_Addresses_AddressLine_2018)
 ## convert DOB to age?
 test <- as.Date(VF18$DOB, "%m/%d/%Y")
 election <- as.Date('11/06/2018', "%m/%d/%Y")
 end18<-as.Date('12/31/2018', "%m/%d/%Y")
 round(age_calc(test[1], end18, unit='years'))
 ## combine VF address lines
-VF18$AddressLine1 <- 
+VF18$AddressLine1 <- paste(VF18$HouseNumber, VF18$StreetName)
 
 #left join
-test<-left_join(L2_mini, VF18, by=c(Voters_FirstName_2018 = FirstName, 
-                                    Voters_MiddleName_2018 = MiddleName,
-                                    Voters_MiddleName_2018 = LastName,
-                                    County = county_name,
-                                    
-                                    Voters_Gender_2018 = Gender
+test<-left_join(L2_mini, VF18, by=c('Voters_FirstName_2018' = 'FirstName', 
+                                    'Voters_MiddleName_2018' = 'MiddleName',
+                                    'Voters_LastName_2018' = 'LastName',
+                                    'county' = 'County',
+                                    'Residence_Addresses_AddressLine_2018' = 'AddressLine1',
+                                    'Voters_Gender_2018' = 'Gender'
                                     ))
 
 
