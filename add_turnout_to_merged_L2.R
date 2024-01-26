@@ -5,6 +5,7 @@
 library(tidyverse)
 library(data.table) #read in data selectively
 library(openxlsx) #save crosstabs as excel sheet
+library(eeptools) #convert dob to age
 
 ############################################################# read in data
 ### L2 Data
@@ -15,12 +16,28 @@ L2 <- subset(L2, select = -c(CountyEthnic_LALEthnicCode_2018,
 ## create mini dataset for troubleshooting
 L2_mini <- L2[sample(nrow(L2), 1000),]
 
-### PA voterfile
-setwd('C:/Users/natha/Desktop/Polling Places/data/FVEData')
-VF18 <- read.csv('voterturnout18.csv')
 
-### merge with L2 records based on name, age, gender, county
-test<-left_join(L2_mini, VF18, by=c())
+### merge with L2 records based on name, address, gender
+## change names to all uppercase
+L2_mini$Voters_FirstName_2018<-toupper(L2_mini$Voters_FirstName_2018)
+L2_mini$Voters_MiddleName_2018<-toupper(L2_mini$Voters_MiddleName_2018)
+L2_mini$Voters_LastName_2018<-toupper(L2_mini$Voters_LastName_2018)
+## convert DOB to age?
+test <- as.Date(VF18$DOB, "%m/%d/%Y")
+election <- as.Date('11/06/2018', "%m/%d/%Y")
+end18<-as.Date('12/31/2018', "%m/%d/%Y")
+round(age_calc(test[1], end18, unit='years'))
+## combine VF address lines
+VF18$AddressLine1 <- 
+
+#left join
+test<-left_join(L2_mini, VF18, by=c(Voters_FirstName_2018 = FirstName, 
+                                    Voters_MiddleName_2018 = MiddleName,
+                                    Voters_MiddleName_2018 = LastName,
+                                    County = county_name,
+                                    
+                                    Voters_Gender_2018 = Gender
+                                    ))
 
 
 
