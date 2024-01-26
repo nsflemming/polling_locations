@@ -43,7 +43,8 @@ setwd("C:/Users/natha/Desktop/Polling Places/data")
 L2_join <- read.csv('vtds_L2_join.csv')
 #### merge L2 demographic data back in
 L2_demog<-fread('PA_combined.csv', 
-          select = c('LALVOTERID',
+          select = c('LALVOTERID', 'Voters_FirstName_2018', 'Voters_MiddleName_2018',
+                     'Voters_LastName_2018',
                      'Residence_Addresses_AddressLine_2018','Residence_Addresses_ExtraAddressLine_2018',
                      'Residence_Addresses_City_2018','Residence_Addresses_State_2018',
                      'Residence_Addresses_Zip_2018',
@@ -51,7 +52,7 @@ L2_demog<-fread('PA_combined.csv',
                      'Voters_Gender_2018','Voters_Age_2018','Parties_Description_2018',
                      'Religions_Description_2018','Voters_OfficialRegDate_2018',
                      'MaritalStatus_Description_2018','CommercialData_PresenceOfChildrenCode_2018',
-                     'CommercialData_HHComposition',
+                     'CommercialData_HHComposition_2018',
                      'CommercialData_EstimatedHHIncomeAmount_2018',
                      'CommercialData_Education_2018','County_2018','Voters_FIPS_2018',
                      'Voters_Active_2018','CountyEthnic_LALEthnicCode_2018',

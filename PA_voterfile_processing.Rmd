@@ -1,0 +1,975 @@
+---
+title: "SODA501 GROUP Paper"
+output:
+  bookdown::html_document2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(results = "hold")
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width = 10)
+knitr::opts_chunk$set(fig.height = 4)
+knitr::opts_chunk$set(fig.align="center")
+```
+
+```{r,warning=F, messgae=F, include=F}
+library(ggplot2)
+library(cowplot) #for arranging ggplots
+library(knitr)
+library(kableExtra) #tables
+library(readxl) #read excel data
+library(tidyr)
+library(plyr) #rbind.fill()
+library(stringr) #string manipulation
+library(RColorBrewer) #colorblind friendly palettes
+library(dplyr) #data manupulation
+library(stringr)
+library(janitor) #for tables
+library(magrittr)
+library(gridExtra) #plot in grid
+
+```
+# Introduction
+
+<!-- insert explanation of goals and where the data comes from?-->
+
+# Pre-Processing and Combining Files with Bash
+
+The data began in the form of 11 zipped folders covering 4 years of data. Within each folder there are tab-delimited files for each county. Each county had a file with "FVE" in the name includes voter demographic and voting history information for past elections labelled 1 to 40. Within each FVE file we have the 153 columns available detailed in Table \@ref(tab: colnamestab)) in the Appendix.
+
+In the FVE data, political party affiliations are denoted by codes, which are explained in a file "Poltical.txt". Within the political file, we notice that there are separate codes that have unusual descriptions with incorrect spellings or non-existent parties, such as "HC" stands for "HILLERY CLINTON". This gets even more complicated with "I" as "INDEPENDENT", "INDd" as "IND.", and "INDE" as "INDEPENDANT". While we could attempt to group these, we air on the side of caution and do not group them to avoid making assumptions. For example, we cannot know whether "ID" as "INDEPENDENT DEMOCRAT" is intended to be Independent or a Democrat.
+
+Each county also has a "Election Map" file which details which a description and date of each of the number election in the voting history correspond to. For example, it may label an election number "2004 GENERAL ELECTION" on 11/04/2004 or "2001 SPECIAL ELECTION" on 11/07/2001. Additionally, there is a "Zone" file for each county which specifies which the precinct name goes with each precinct code.
+
+Due to the amount of files and memory space the original data form takes, we used Bash to combined all counties, split the data into demographic and election history files per year. We use these column numbers from Table \@ref(tab:colnamestab))
+
+We ran the code below changing the years to be 2017, 2018, 2019, and 2020 each time. The 2020 code is shown below. 
+
+```{bash,eval=F,echo=T}
+#Start in directory with zipped folders of FVE files, run for each year 2017 to 2020 (2020 shown here)
+
+touch FVEData/pa2019.txt FVEData/hist2019.txt #create blank .txt files
+
+for z in *2019*.zip #cycle zip files that include 2020
+do
+	rm -r TempWork #clear TempWork if there's anything there
+	mkdir TempWork #create TempWork to store intermediary steps
+	unzip "$z" -d TempWork #unzip each file into TempWork folder
+	cd TempWork #change to TempWork
+	for d in */ #for each folder
+	do	
+		cd "$d" #go into the folder
+		for f in *FVE* #for each FVE file
+		do
+			#echo "$f" #uncomment to print file name in terminal
+			#add columns 1,3 to 9, 12, 27,28, 70 to 150 and 152 to hist2020.txt
+			cat "$f" | cut -d$'\t' -f1,3-9,12-12,27-28,70-150,152    >> ../../FVEData/hist2019.txt
+			#add columns 1,3 to 10, 12 to 20, 23,25 to 29, and 152 to pa2020.txt
+			cat "$f" | cut -d$'\t' -f1,3-10,12-20,23-23,25-29,152  >> ../../FVEData/pa2019.txt
+		done
+	done
+	cd ..//..// #go back to original folder
+done
+#get matching headers and combine to final files. 
+cat headernames.txt| cut -d$'\t' -f1,3-10,12-20,27-28,70-150,152 > FVEData/voterhistory2019.txt
+cat FVEData/hist2019.txt>> FVEData/voterhistory2019.txt
+cat headernames.txt| cut -d$'\t' -f1,3-10,12-20,23-23,25-29,152 > FVEData/voterdata2019.txt
+cat FVEData/pa2019.txt>> FVEData/voterdata2019.txt
+#clean up unnecessary files
+rm FVEData/hist2019.txt FVEData/pa2019.txt
+rm -r TempWork
+```
+
+
+## Further Demographic Data Processing
+
+With this file, we further process the demographic information we read in files and replaced the letter indications of political party with the full description from "Political.txt" file. We saved it as a Rdata file to make the file size smaller that the original tab-delimited size.
+
+For each year, we loaded the file, replaced the political party, and saved as a .Rdata file. Below is 2017, but the process was repeated for each year changing the "17" and "2017" to the corresponding year.
+
+```{r,eval=F}
+#Read in political description based on letter code
+political<-read.delim("Political.txt")
+political<-political[,1:2]
+#2017
+df17<-read.delim("FVEData/voterdata2017.txt")
+df17$PartyCode<-as.factor(political$Political.Party.Description[match(df17$PartyCode,political$Code)])
+save(df17,file="voterdemographics2017.RData")
+#to read in .RData item use:  load("voterdemographics2017.RData")
+```
+
+ 
+```{r,eval=F,echo=F}
+#2018
+df18<-read.delim("FVEData/voterdata2018.txt")
+df18$PartyCode<-as.factor(political$Political.Party.Description[match(df18$PartyCode,political$Code)])
+save(df18,file="voterdemographics2018.RData")
+#to read in .RData item use:
+#load("voterdemographics2018.rds")
+```
+
+```{r,eval=F,echo=F}
+#2019
+df19<-read.delim("voterdata2019.txt")
+df19$PartyCode<-as.factor(political$Political.Party.Description[match(df19$PartyCode,political$Code)])
+save(df19,file="voterdemographics2019.RData")
+#to read in .RData item use:
+#load("voterdemographics2019.RData")
+```
+
+```{r,eval=F,echo=F}
+#2020
+df20<-read.delim("FVEData/voterdata2020.txt")
+df20$PartyCode<-as.factor(political$Political.Party.Description[match(df20$PartyCode,political$Code)])
+save(df20,file="voterdemographics2020.RData")
+#to read in .RData item use:
+#load("voterdemographics2020.rds")
+```
+
+## Further Processing of Election History
+
+```{r}
+#2019
+histdf19<-read.delim("voterhistory2019.txt")
+save(histdf19,file="voterhistory2019.RData")
+#to read in .RData item use:
+#load("voterhistory2019.rds")
+```
+## Finding 2018 General election code for each county
+```{r}
+setwd('C:\\Users\\natha\\Desktop\\Polling Places\\data\\ElectionMapData')
+#get files
+files=list.files()
+# select 2019 files
+files=files[str_which(files, ".*(?=2019)")]
+#initialize dataframe
+genelec18map<-data.frame()
+#read in each county's 2019 election map
+for (file in files){
+  temp = read.delim(file, header=FALSE)
+  #extract the id code for the 2018 general election and rbind
+  genelec18map=rbind(genelec18map, temp[temp$V3=='2018 GENERAL ELECTION',1:2])
+  }
+#save
+#setwd('C:\\Users\\natha\\Desktop\\Polling Places\\data')
+#save(genelec18map,file="genelec18map.RData")
+#write.csv(genelec18map,file="genelec18map.csv")
+```
+
+```{r}
+############################################ Trim voter history to 2018 general
+counties <- unique(histdf19$County)
+histdf19_trim <- data.frame()
+for (county in counties){
+  pattern <- paste0('Election',
+                    genelec18map$V2[genelec18map$V1==county],
+                    'Vote',
+                    '|County|PrecinctCode|PrecinctSplitID|LastName|FirstName|MiddleName|IDNumber')
+  temp <- histdf19[histdf19$County == county,] %>%
+    select(matches(pattern))
+  histdf19_trim<-rbind.fill(histdf19_trim, temp)
+  rm(temp)
+}
+#combine turnout columns
+histdf19_trim<-histdf19_trim%>%
+  mutate(VoteMethod = coalesce(Election12VoteMethod, Election9VoteMethod, 
+                               Election11VoteMethod, Election17VoteMethod,
+                               Election36VoteMethod, Election8VoteMethod,
+                               Election7VoteMethod, Election13VoteMethod,
+                               Election4VoteMethod, Election14VoteMethod,
+                               Election40VoteMethod, Election10VoteMethod,
+                               Election19VoteMethod, Election35VoteMethod,
+                               Election39VoteMethod, Election1VoteMethod,
+                               Election3VoteMethod, Election15VoteMethod,
+                               Election30VoteMethod, Election6VoteMethod,
+                               Election2VoteMethod, Election20VoteMethod,
+                               Election26VoteMethod, Election5VoteMethod)) %>%
+  select(-c(Election12VoteMethod, Election9VoteMethod, 
+            Election11VoteMethod, Election17VoteMethod,
+            Election36VoteMethod, Election8VoteMethod,
+            Election7VoteMethod, Election13VoteMethod,
+            Election4VoteMethod, Election14VoteMethod,
+            Election40VoteMethod, Election10VoteMethod,
+            Election19VoteMethod, Election35VoteMethod,
+            Election39VoteMethod, Election1VoteMethod,
+            Election3VoteMethod, Election15VoteMethod,
+            Election30VoteMethod, Election6VoteMethod,
+            Election2VoteMethod, Election20VoteMethod,
+            Election26VoteMethod, Election5VoteMethod))
+rm(histdf19)
+#save
+write.csv(histdf19_trim, 'voterturnout18.csv')
+
+############# Add voter name, age, and gender back in to voter history dataframe
+load('voterdemographics2019.RData')
+test=merge(histdf19_trim, df19[,c('IDNumber','Gender', 'DOB', 'HouseNumber',
+                                  'HouseNumberSuffix', 'StreetName', 
+                                  'ApartmentNumber', 'AddressLine2','City','Zip')],
+           by='IDNumber')
+#save
+write.csv(test, file='voterturnout18.csv')
+```
+
+
+
+
+
+### Collecting Election Map Files
+We used Bash to get a list of counties and collected all Election Map files adding a column for the file name it came from.
+
+First we made the counties list and moved all the Election Map files into one folder using Bash.
+
+```{bash, eval=F}
+rm countieslist.txt #remove if countieslist file exists already (to avoid duplication)
+touch countieslist.txt #make counties list file
+
+for z in *2020*.zip #for 2020 files
+do
+	rm -r TempWork
+	mkdir TempWork
+	unzip "$z" -d TempWork #unzip files
+	cd TempWork
+	for d in */ #go in one folder level
+	do	
+		cd "$d"
+		#for each FVE file add county to countieslist.txt
+		for f in *FVE*
+		do
+		echo "${f% FVE*}">>../../countieslist.txt
+		done #
+		mv *Election*.txt ../../ElectionMapData/ #move all Election Map files to new folder
+		cd .. #move up a directory
+	done
+	cd .. #move up a directory
+done
+for z2 in *201*.zip #for other years
+do
+	rm -r TempWork
+	mkdir TempWork
+	unzip "$z2" -d TempWork
+	cd TempWork
+	for d2 in */
+	do	
+		cd "$d2"
+		mv *Election*.txt ../../ElectionMapData/ #move Election Map files to other folder
+		cd ..
+	done
+	cd ..
+done
+rm -r TempWork
+```
+
+Then we collected all Centre county election maps to investigate potential overlap in the reported election history.
+
+```{bash,eval=F}
+touch CENTREmaps.txt #make new files
+
+for f in ElectionMapData/CENTRE* #for all Centre county Election Map files
+do #add file name and combine.
+	awk 'NR=1{print $0 "\t"FILENAME}NR>1{print $0 "\t"FILENAME}' "$f">tempfile && mv tempfile "$f"
+	cat "$f">>CENTREmaps.txt #add election map file to combined file
+done
+```
+
+We then returned to R to read in the collected election maps for Centre county, and noticed 2017 and 2020 together contain all listed election history as seen in the Table \@ref(tab:overl) ). 
+
+```{r}
+centre<-read.delim("C:/Users/natha/OneDrive/Desktop/SoDA 501/FInal Project/Data processing/CENTREmaps.txt",header=FALSE)
+colnames(centre)<-c("County","Election","Description","Date","FileName","Extra")
+#Get the Year from the File Name, and make indicators if an entry is in a Year
+check<-centre[,1:5]%>%filter(!("Municipal"%in%Description) & County=="CENTRE")%>%
+  mutate(Year=substr(FileName,nchar(centre$FileName[1])-11,nchar(centre$FileName[1])-8))%>%
+  mutate(In2017=ifelse(Year==2017,1,0),In2018=ifelse(Year==2018,1,0),
+         In2019=ifelse(Year==2019,1,0),In2020=ifelse(Year==2020,1,0))%>%
+  group_by(Description,Date)%>%
+  summarise(count=n_distinct(Year),In2017=(max(In2017)==1),In2020=(max(In2020)==1))
+```
+
+```{r overl, results="asis",echo=F}
+kable(xtabs(~In2017+In2020,data=check),booktabs=T,
+      caption="Centre County Elections in Election Maps.")%>%
+  kable_classic()%>%kable_styling(full_width=F)%>%
+  add_header_above(c("In 2017"=1,"In 2020"=2))%>%column_spec(1,border_right = T)
+```
+
+We return to Bash to check that this was true across all counties with the following script, which prints the number of lines in a combined 2020 and 2017 Election Map file, and the number of lines across all Election Maps which can be found in the combined 2020 and 2017 Election Maps.
+
+```{bash, eval=F}
+clist=$(cat countieslist.txt) #get counties list
+cd ElectionMapData
+
+for c in $clist #for each county
+do
+	# echo "$c" #uncomment to print county in terminal
+	touch tempfile.txt temp1720.txt #create two temporary files
+	for f in "$c"*2017* #for 2017 files from this county
+	do #select description and date columns
+		cat "$f"| cut -f3,4| awk '!/MUNICIPAL/'>>tempfile.txt #remove Municipal elections
+		cat "$f"| cut -f3,4| awk '!/MUNICIPAL/'>>temp1720.txt
+	done
+	for f in "$c"*2020* #repeat for 2020
+	do
+		cat "$f"| cut -f3,4| awk '!/MUNICIPAL/'>>tempfile.txt
+		cat "$f"| cut -f3,4| awk '!/MUNICIPAL/'>>temp1720.txt
+	done
+	for f in "$c"*2018* #for 2018 only add to tempfile.txt
+	do; cat "$f"| cut -f3,4| awk '!/MUNICIPAL/'>>tempfile.txt; done
+	for f in "$c"*2019* #for 2019 only add to tempfile.txt
+	do; cat "$f"| cut -f3,4| awk '!/MUNICIPAL/'>>tempfile.txt; done
+	
+	fgrep -c -f temp1720.txt tempfile.txt #print number of tempfile.txt rows matching a temp1720.txt row 
+	wc -l tempfile.txt #print row count of full tempfile.txt (these should match)
+	rm temp1720.txt tempfile.txt
+	if [[ "$c" == PHILADELPHIA ]];then break; fi #if at Philadelphia stop the cycle.
+done
+```
+
+The printed output (omitted) showed that all elections listed in Election Maps were contained in either the 2017 Election Maps or in the 2020 Election Maps. Thus we combined the 2017 and 2020 maps for all counties.
+
+```{bash, eval=F}
+clist=$(cat countieslist.txt) #get county list
+cd ElectionMapData #go to ElectionMapData folder
+
+
+for c in $clist #for each county
+do
+	touch ../MapData20172020/"$c"maps1720.txt #make file for each county
+	for f in "$c"*2017* #for 2017 files
+	do #add file name and remove municipal elections
+		awk 'NR=1{print $0 "\t"FILENAME}NR>1{print $0 "\t"FILENAME}' "$f"|awk '!/MUNICIPAL/'>tempfile 
+		cat tempfile>>../MapData20172020/"$c"maps1720.txt
+	done
+	for f in "$c"*2020* #repeat for 2020 maps
+	do 
+		awk 'NR=1{print $0 "\t"FILENAME}NR>1{print $0 "\t"FILENAME}' "$f"|awk '!/MUNICIPAL/'>tempfile 
+		cat tempfile>>../MapData20172020/"$c"maps1720.txt
+	done
+	if [[ "$c" == PHILADELPHIA ]];then break; fi #stop cycling after Philadelphia
+done
+cd ..
+touch mastermap.txt #create master list file.
+cd MapData20172020
+for f in *.txt  #for each map file
+do;cat "$f">>../mastermap.txt; done #combine into one file
+```
+
+### Cleaning Election Map Files
+
+Then we edited the mastermaps data to standardize the election descriptions and add a year column. We are only interested Special Elections and General Elections, so we remove all Municipal and Primary elections.
+```{r countyelecnum,results="asis"}
+maps<-read.delim("mastermap.txt",header=F) #read in data
+colnames(maps)<-c("County","ElectNum","Description","Date","FileName") #add column names
+
+#add year column
+maps<-maps%>%mutate(filechar=nchar(FileName))%>% #get number of characters
+  mutate(Year=substr(FileName,filechar-11,filechar-8))%>% #select 4 characters before .txt
+  select(-filechar) #remove character count
+
+#standardize Descriptions (trim white space, remove punctuation, capitalize all of them)
+maps$Description<-trimws(gsub('[[:punct:]]','', #remove punctuation
+                              toupper(maps$Description)), #capitalize
+                         which="both") #trim leading and trailing white space
+maps<-maps[!(grepl("MUNIC",maps$Description))&!(grepl("PRIM",maps$Description)),] #remove city & primary
+```
+
+```{r,echo=F}
+numcounties<-maps%>%group_by(County)%>%summarize(NumberElections=n())
+```
+
+The we look at date's with multiple unique descriptions of the corresponding elections. A portion of the output is shown below
+```{r,echo=T,eval=F}
+#keep entries with multiple unique descriptions on a given date
+duplicateDescriptions<-maps%>%group_by(Date)%>%
+  summarise(Count=n_distinct(Description))%>%
+  filter(Count>1)
+
+for(dt in duplicateDescriptions$Date){ #print out the Dates and multiple descriptions
+  listunique<-unique(maps$Description[maps$Date==dt])
+  cat("\n \nDate is ",dt)
+  for(desc in listunique){
+    cat("\n",desc)
+  }
+}
+```
+
+```{r,echo=F,eval=T}
+duplicateDescriptions<-maps%>%group_by(Date)%>%
+  summarise(Count=n_distinct(Description))%>%
+  filter(Count>1)
+ct=0
+for(dt in duplicateDescriptions$Date){ #print out the Dates and multiple descriptions
+  ct=ct+1
+  listunique<-unique(maps$Description[maps$Date==dt])
+  if(ct%in%c(4,11,30,31)){
+    cat("\n \nDate is ",dt)
+    for(desc in listunique){cat("\n",desc)}
+  }
+  if(ct>30){break}
+}
+```
+
+We see a couple of interesting cases. First on 11/07/2001, there is a General Election and a Special Election, which shouldn't happen. We find Centre county had a special Election on 11/07/2001 and Northumberland lists a general election on that date (Table \@ref(tab:investigate)). However, Centre county and other counties had a general election on 11/06/2001 suggesting something is wrong with Northunberland's entry. Since Northumberland didn't have any other general or special elections in 2001, we suspect the date is incorrect on the entry and Northumberland's general election was actually on 11/06/2001 like other counties.
+
+```{r investigate,results="asis",echo=F}
+#Investigate Special and General on Same Day
+ctyspec<-unique(maps$County[grepl("SPECIAL",maps$Description)& maps$Date=="11/07/2001"])
+#CENTRE has Special Election 11/7/2001
+
+ctygen<-maps$County[!grepl("SPECIAL",maps$Description)& maps$Date=="11/07/2001"] #NORTHUMBERLAND has General 11/7/2001
+
+kable(rbind(maps[(maps$County%in% c(ctyspec,ctygen)) & 
+             grepl("/2001",maps$Date) & (maps$Year%in%c("2020",2020)),c(1,3,4,6)],
+            head(maps[grepl("2001",maps$Description),c(1,3,4,6)]),
+            maps[grepl("CHANGED",maps$Description),]%>%select(-FileName,-ElectNum)),
+      caption="Election Descriptions Under Investigation (such as Conflicting 11/07/2001 Descriptions or Changed Registration Description) Compared with Others")%>% kable_classic()
+#CENTRE has GENERAL on 11/6/2001
+
+
+#Conclusion NORTHUMBERLAND likely has Data wrong on thier General Election.
+maps$Date[maps$County=="NORTHUMBERLAND" & maps$Date=="11/07/2001"]<-"11/06/2001"
+maps<-maps[!grepl("CHANGED",maps$Description),] #removed
+```
+
+Additionally, there are a couple of occurrences of "Changed Registration" in the Election Descriptions. We see only Lawrence county reports this, so we remove it (Table \@ref(tab:investigate)). The last task is to unify the formatting for general election descriptions.
+
+
+```{r,eval=F}
+#Unify GENERAL ELECTIONS
+generals<-c("11/02/1999","11/02/2004","11/08/2005","11/03/1998","11/07/2006",
+            "11/07/2006","11/03/2009","11/04/1997","11/04/2008","11/07/2007",
+            "11/07/1995","11/04/2003","11/05/2002","11/06/2001","11/06/2007",
+            "11/07/2000")
+for(d in generals){
+  maps$Description[maps$Date==d]<-paste(substr(d,7,10),"GENERAL ELECTION")
+}
+```
+
+Now we make a list of the elections reported the 2017 history data, and the elections reported only in the 2020 history data. We then create a file to help select the column numbers we want to keep using Bash. Below you can see how this is done for 2017 Election Maps.
+
+```{r,eval=F}
+check<-maps%>%group_by(County)%>%distinct(Date,.keep_all=T)%>%ungroup() #keep distinct Dates per County
+
+#get elections in 2017 history data and elections only in 2020 history data
+elections2020<-check[check$Year=="2020",]
+elections2017<-check[check$Year=="2017",]
+
+extract_electionsids<-rbind(elections2017,elections2020) #make dataframe of these
+write.table(extract_electionsids,file="ExtractedElections.txt",sep="\t",row.names = F,quote = F)
+
+get_fields<-function(ElectNum,OtherFields=c(1,6,7,8,9,10,11,93)){
+  out<-OtherFields #IDNumber,Gender,DOB,RegistrationDate,PartyCode,PrecentCode, PrecinctSplitID,County
+  ElectNum1<-11+(2*ElectNum) #get Party column number
+  ElectNum2<-11+((2*ElectNum)+1) #get Method column number
+  out<-c(OtherFields,ElectNum1,ElectNum2) #combine
+  paste(sort(out),collapse=",") #make one comma-separated list
+}
+#For 2017
+bash_electionmap17_guide<-elections2017%>%filter(Year==2017)%>%
+  select(County,FileName,ElectNum)%>%group_by(County,FileName)%>%arrange(ElectNum)%>%
+  summarise(Elections=paste(ElectNum,collapse=","),Fields=get_fields(ElectNum))
+
+bash_electionmap17_guide$TargetFile<-str_replace(bash_electionmap17_guide$FileName,
+                                                 "Election Map","FVE") #change file name
+
+#save as tab-delimited text file
+write.table(bash_electionmap17_guide%>%select(County,TargetFile,Fields),
+            file="Bash_ElectionMaps17.txt",sep="\t",row.names = F,quote = F)
+
+```
+
+
+
+
+
+```{r,echo=F,eval=F}
+elections2020%>%select(County,ElectNum,Description)%>%group_by(County,ElectNum,Description)%>%summarize(Count=n())%>%arrange(Count)
+bash_electionmap20_guide<-elections2020%>%
+  select(County,FileName,ElectNum)%>%
+  group_by(County,FileName)%>%arrange(ElectNum)%>%
+  summarise(Elections=paste(ElectNum,collapse=","),Fields=get_fields(ElectNum))
+bash_electionmap20_guide$TargetFile<-str_replace(bash_electionmap20_guide$FileName,"Election Map","FVE")
+bash_electionmap20_guide
+write.table(bash_electionmap20_guide%>%select(County,TargetFile,Fields),file="Bash_ElectionMaps20.txt",sep="\t",row.names = F,quote = F)
+```
+
+
+## Further Subsetting Election Data
+
+Using the tab-delimited files made in the last section we return to Bash to select only the columns that correspond to elections we are interested in.
+
+First we preform the same subsetting of the history files for only 2017 and 2020, but save them as individual counties.
+
+```{bash,eval=F}
+#!/bin/bash
+# A simple script
+
+#Starting in directory with zipped folders of the FVE files
+mkdir HistCounty
+mkdir HistCounty/UnProcessed
+
+for z in *2020*.zip #for 2020 zipped folders
+do
+	rm -r TempWork
+	mkdir TempWork
+	unzip "$z" -d TempWork
+	cd TempWork
+	for d in */
+	do	
+		cd "$d"
+		for f in *FVE* #for each file from the zipped folder
+		do
+			c=${f% FVE*} #get county from filename
+			touch ../../HistCounty/UnProcessed/"$c"hist2020.txt #make file
+			cat ../../headernames.txt| cut -d$'\t' -f1,3-9,12-12,27-28,70-150,152 >> ../../HistCounty/UnProcessed/"$c"hist2020.txt
+			cat "$f" | cut -d$'\t' -f1,3-9,12-12,27-28,70-150,152    >> ../../HistCounty/UnProcessed/"$c"hist2020.txt
+		done
+	done
+	cd ..//..//
+done
+
+for z in *2017*.zip #repeat for 2017
+do
+	rm -r TempWork
+	mkdir TempWork
+	unzip "$z" -d TempWork
+	cd TempWork
+	for d in */
+	do	
+		cd "$d"
+		for f in *FVE*
+		do
+			c=${f% FVE*}
+			touch ../../HistCounty/UnProcessed/"$c"hist2017.txt
+			cat ../../headernames.txt| cut -d$'\t' -f1,3-9,12-12,27-28,70-150,152 >> ../../HistCounty/UnProcessed/"$c"hist2017.txt
+			cat "$f" | cut -d$'\t' -f1,3-9,12-12,27-28,70-150,152    >> ../../HistCounty/UnProcessed/"$c"hist2017.txt
+		done
+	done
+	cd ..//..//
+done
+
+rm -r TempWork
+```
+
+Now we use the earlier files to select only the elections of interest, and only the IDNumbers that appear in both.
+```{bash,eval=F}
+
+mkdir HistCounty/Reshaped #make folder
+clist=$(cat countieslist.txt) #get counties list
+
+#cycle counties
+for c in $clist #for each county
+do
+	rm -r HistCounty/TempWork #clean up Tempwork folder
+	mkdir HistCounty/TempWork
+	#get the list of fields from Bash_ElectionMaps files for the selected county
+	line17=$(cat Bash_ElectionMaps17.txt| awk -F'\t' -v cty="$c" '{if ($1==cty) {printf $3}}')
+	line20=$(cat Bash_ElectionMaps20.txt| awk -F'\t' -v cty="$c" '{if ($1==cty) {printf $3}}')
+	
+	#get unique IDNumbers for 2017 and for 2020
+	cat HistCounty/UnProcessed/"$c"hist2017.txt|sed '1d'| cut -f1 -d$'\t' | sort | uniq -u >HistCounty/TempWork/ID17.txt 
+	cat HistCounty/UnProcessed/"$c"hist2020.txt|sed '1d'| cut -f1 -d$'\t' | sort | uniq -u >HistCounty/TempWork/ID20.txt
+	
+	#set up files with headers to match selected elections
+	cat HistCounty/UnProcessed/"$c"hist2017.txt|cut -f$line17 -d$'\t'| awk '{print $0 "\tYear"}'| head -n1>HistCounty/Reshaped/"$c"hist17.txt
+	cat HistCounty/UnProcessed/"$c"hist2020.txt|cut -f$line20 -d$'\t' | awk '{print $0 "\tYear"}'| head -n1>HistCounty/Reshaped/"$c"hist20.txt
+
+ # find the shared IDNumbers across the two files
+	comm -1 -2 HistCounty/TempWork/ID17.txt HistCounty/TempWork/ID20.txt>HistCounty/TempWork/shared.txt
+	wc -l HistCounty/TempWork/shared.txt
+
+  #get selected elections and add year column
+	cat HistCounty/UnProcessed/"$c"hist2017.txt|sed '1d'| cut -f$line17 -d$'\t'|awk -v Year='"2017"' 'NR=1{print $0 "\t"Year}' >HistCounty/TempWork/temp17.txt 
+	cat HistCounty/UnProcessed/"$c"hist2020.txt|sed '1d'| cut -f$line20 -d$'\t'| awk -v Year='"2020"' '{print $0 "\t"Year}'>HistCounty/TempWork/temp20.txt 
+	
+	#select only the rows with IDNumbers in the shared.txt file
+	awk -F'\t' 'NR==FNR{a[$1];next} FNR==1 ||$1 in a' HistCounty/TempWork/shared.txt HistCounty/TempWork/temp17.txt >HistCounty/TempWork/tempout17.txt
+	awk -F'\t' 'NR==FNR{a[$1];next} FNR==1 ||$1 in a' HistCounty/TempWork/shared.txt HistCounty/TempWork/temp20.txt >HistCounty/TempWork/tempout20.txt
+	
+	#add to header files
+	cat HistCounty/TempWork/tempout17.txt | sort |uniq -u>>HistCounty/Reshaped/"$c"hist17.txt
+	cat HistCounty/TempWork/tempout20.txt | sort |uniq -u>>HistCounty/Reshaped/"$c"hist20.txt
+done
+```
+
+# Investigating Voter Changes in Party Over Time
+
+We restrict our interest further to looking at only changes between being registered as a Republican, Democrat, Libertarian, or Independent. We consider not voting as no change in party affiliation. We do not consider other listed Parties as changes, such as "Unknown" or "No Affiliation" or "Non-Partisan". This is due to the shear quantity of Party labels indicating similar ideas to these. Additionally, misspelled versions of Republican, Democrat, Libertarian or Independent are not counted for simplify. Finally, we found that people that move counties or leave the state will not be matched across 2017 to 2020 files.
+
+We write several functions that allow use to transpose the data so each election for each person is it's own row. 
+
+```{r,eval=F}
+longerdf<-function(df, electdf){ #function to pivot to longer and add Election Descriptions
+  longmethod<-df%>%
+  select(-ends_with("Party"))%>% #select all but Party columns
+  pivot_longer(cols=ends_with("VoteMethod"),names_to = "Election", #save column names as "Election"
+               values_to = "Method", values_drop_na = FALSE)%>% #pivot Election Method columns
+  mutate(ElectNum=as.numeric(gsub("[[:alpha:]]","",Election)))%>% #get Election Number
+  select(-Election) #remove original Election column
+
+#Repeat with Election Party Information 
+longparty<-df%>%select(-ends_with("VoteMethod"))%>%
+  pivot_longer(cols=ends_with("Party"),names_to = "Election",
+               values_to = "Party",values_drop_na = FALSE)%>%
+  mutate(ElectNum=as.numeric(gsub("[[:alpha:]]","",Election)),Method=longmethod$Method)%>%
+  select(-Election)%>%
+  left_join(electdf[,2:4],by="ElectNum") #merge election Dates and Descriptions
+return(longparty)
+}
+```
+
+We keep only General Elections and create a Election Year variable. We also add an indicator for elections that have a new Party (Republican, Democrat, Libertarian, or Independent) from the last time they voted under one of those parties. For each county we save the new data with these changes. Additionally we collect all instances of Party changes across all counties in a separate file. 
+
+```{r,eval=F}
+postvotefunc<-function(df17,df20,electdf,outputname,includeheader=F){
+  #split election file by year
+  elec17<-electdf[as.numeric(electdf$Year)==2017,]
+  elec20<-electdf[as.numeric(electdf$Year)==2020,]
+  
+  # keep only General Elections and make Election Year Column
+  histelec17<-longerdf(df17,elec17)%>%filter(grepl("GENERAL ELECTION",Description))%>%
+    mutate(ElectYear=as.numeric(gsub("[[:alpha:]]","",Description)))%>%
+    select(-Description,-Date)
+  histelec20<-longerdf(df20,elec20)%>%filter(grepl("GENERAL ELECTION",Description))%>%
+    mutate(ElectYear=as.numeric(gsub("[[:alpha:]]","",Description)))%>%
+    select(-Description,-Date)
+  
+  combined<-rbind(histelec17,histelec20) #combine
+  rm(elec17,elec20,histelec17,histelec20) #remove unnecessary
+  
+  #remove entries before the first vote record per person
+  postvote<-combined%>%group_by(IDNumber)%>%arrange(ElectYear,.by_group = T)%>%
+    mutate(MethodIndicator=if_else(Method==""|is.na(Method),0,1))%>%
+    mutate(FilterVar=cumsum(MethodIndicator))%>%filter(FilterVar>0)%>%
+    select(-FilterVar,-MethodIndicator)
+  
+  #Collecting Republican, Democrat, Libertarian, and Independent Changes (all other ignored)
+  changeindx<-postvote%>%filter(Party%in%c("R","D","LN","I"))%>%
+    group_by(IDNumber)%>%arrange(ElectYear,.by_group = T)%>%
+    mutate(lagParty=lag(Party,default=first(Party)))%>% #get last party in history
+    mutate(changeindicator=as.numeric(if_else(Party==lagParty,0,1)))%>% #change indicator
+    filter(changeindicator==1)%>% #keep only changes
+    select(IDNumber,ElectYear,Party,lagParty,changeindicator,County,PrecinctSplitID,Gender,DOB)
+  changeindx$fromtoParty<-paste(as.character(changeindx$lagParty),
+                                as.character(changeindx$Party),sep="_to_")
+  #add to file of changes
+  write.table(changeindx,"ChangeFilesAll.txt",sep="\t",
+              row.names = F,col.names=includeheader,append=T)
+  
+  #repeat only considering Republican and Democrat
+  changeindx<-postvote%>%filter(Party%in%c("R","D"))%>%group_by(IDNumber)%>%
+    arrange(ElectYear,.by_group = T)%>%mutate(lagParty=lag(Party,default=first(Party)))%>%
+    mutate(changeindicator=as.numeric(if_else(Party==lagParty,0,1)))%>%
+    filter(changeindicator==1)%>% 
+    select(IDNumber,ElectYear,Party,lagParty,changeindicator,
+                                              County,PrecinctSplitID,Gender,DOB)
+  changeindx$fromtoParty<-paste(as.character(changeindx$lagParty),
+                                as.character(changeindx$Party),sep="_to_")
+  #create unique ID for IDNumber and Year
+  changeindx$tempId<-paste(changeindx$IDNumber,as.character(changeindx$ElectYear),sep="")
+  postvote$tempId<-paste(postvote$IDNumber,as.character(postvote$ElectYear),sep="")
+  #merge change index with county voting history by this identifier
+  postvote<-postvote%>%left_join(changeindx[,c(5,10,11)],by="tempId")%>%ungroup()%>%
+    mutate(changeindicator=replace_na(changeindicator,0),
+          fromtoParty=replace_na(fromtoParty,"NoChange"))%>%
+    select(-tempId,-Year,-ElectNum,-PartyCode)
+  #print the following which can be copied and pasted into a text file if needed.
+  cat(postvote$County[1],", ",length(postvote$IDNumber),", ", #County, Number of Historic Votes info
+      length(changeindx$IDNumber),",", #Number of changes in historic votes info
+      length(unique(postvote$IDNumber)),",", #number of voters
+      length(unique(changeindx$IDNumber)),"\n") #number of voters with changes
+  #add change data to a file
+  write.table(changeindx%>%select(-tempId),"ChangesFileDR.txt",sep="\t",
+              row.names = F,col.names=includeheader,append=T)
+  write.table(postvote,outputname,sep='\t',row.names = F) #save county data
+  return(postvote)
+}
+
+```
+
+Then we deploy these functions for all counties using a for loop.
+
+```{r,eval=F}
+gc() #collect garbage output
+extract_electionsids<-read.delim("ExtractedElections.txt",sep="\t") #get election info
+counties<-read.delim("countieslist.txt",header=F) #counties list
+
+#start with first county, ADAMS
+temp17<-read.delim(paste("HistCounty/Reshaped/ADAMShist17.txt",sep=""))
+temp20<-read.delim(paste("HistCounty/Reshaped/ADAMShist20.txt",sep=""))
+  election<-extract_electionsids[extract_electionsids$County==cty,]
+  a<-postvotefunc(temp17,temp20,election,
+                  paste("HistCounty/ROutput/ADAMShist.txt",sep=""),
+                  includeheader=T) #include header
+  
+test<-counties$V1[2:67] #other counties
+for(cty in test){ #cycle other counties
+  temp17<-read.delim(paste("HistCounty/Reshaped/",cty,"hist17.txt",sep=""))
+  temp20<-read.delim(paste("HistCounty/Reshaped/",cty,"hist20.txt",sep=""))
+  election<-extract_electionsids[extract_electionsids$County==cty,]
+  a<-postvotefunc(temp17,temp20,election,
+                  paste("HistCounty/ROutput/",cty,"hist.txt",sep=""))
+}
+
+```
+
+
+With the files collected of occurrences of voters changing party, we can finally start investigating changes in political parties in Pennsylvania. 
+
+```{r}
+political<-read.delim("Political.txt")
+
+processchangefile<-function(changes,polifile){
+  changes<-distinct(changes)%>%filter(IDNumber!="IDNumber")%>%
+    mutate(ElectType=as.factor(ElectYear%%4),fromtoParty=gsub("R","Republican",fromtoParty))%>%
+    mutate(ElectType=recode(ElectType,"0"="Presidential","2"="Midterm",
+                            "3"="QuaterTerm","1"="QuaterTerm"),
+           fromtoParty=gsub("D","Democrat",fromtoParty),
+           Date=paste("11/05/",as.character(ElectYear),sep=""))%>%
+    mutate(fromtoParty=gsub("I","Independent",fromtoParty),
+         Age=trunc(as.numeric(difftime(as.Date(Date,"%m/%d/%Y"),
+                                       as.Date(DOB,"%m/%d/%Y"),unit="days")/365)))%>%
+    mutate(fromtoParty=gsub("LN","Libertarian",fromtoParty))%>%
+    mutate(fromtoParty=gsub("_"," ",fromtoParty),ElectYear=as.numeric(ElectYear))%>%
+    select(-Date)
+  changes$ToParty<-as.factor(political[match(changes$Party,political$Code),2])
+  changes$FromParty<-as.factor(political[match(changes$lagParty,political$Code),2])
+  changes
+}
+changes<-processchangefile(read.delim("~/SODA/FinalProject/ChangeFilesAll.txt"),political)
+changeDR<-processchangefile(read.delim("~/SODA/FinalProject/ChangesFileDR.txt"),political)
+
+
+```
+
+```{r tofromyear, echo=F,fig.width=15,fig.height=4,fig.cap="Changes in Party By Type and by whether and Election is a Presidential or Midterm Year."}
+#getting colors for parties
+demcols<-brewer.pal(9,"Blues")[c(3,5,7)]
+indcols<-brewer.pal(9,"PuRd")[c(4,5,6)]
+libcols<-brewer.pal(6,"YlOrBr")[c(2,3,4)]
+repcols<-brewer.pal(9,"Reds")[c(3,5,7)]
+colorspartytype<-c(rev(demcols),indcols,libcols,rev(repcols))
+
+#reorder factor levels to put similar changing to parties together
+factorlist<-changes%>%select(fromtoParty,Party)%>%ungroup()%>%arrange(Party)%>%distinct(fromtoParty)
+changes$fromtoParty<-factor(changes$fromtoParty,levels=factorlist$fromtoParty)
+
+graphoveryear<-function(changes,groupcol,titlestr,legendlab){ #function for graphing over years
+  countbyyear<-changes%>%mutate(groupvar=groupcol)%>%group_by(ElectYear,groupvar,Party)%>%
+    arrange(ElectYear,.by_group = T)%>%summarize(Count=n()/1000)
+  overallplot<- ggplot(data=countbyyear%>%arrange(Party),aes(x=ElectYear,y=Count,col=groupvar))+
+    geom_point()+geom_line()+theme_bw()+
+    geom_vline(xintercept=c(2000,2004,2008,2012,2016),lty=2,col="black")+
+    labs(x="Election Year",y="Number of Changes (thousands)",col=legendlab,title=titlestr)+
+    scale_x_continuous(breaks=seq(1998,2019,by=2))
+}
+
+c1<-graphoveryear(changes, changes$fromtoParty,
+                  "Party Registration Changes over Time in Pennsylvania", 
+                  "Party Change Type")+
+  scale_color_manual(values=colorspartytype)+
+  labs(subtitle = "Only Considering Democrat, Republican, Liberatarian, and Indepedent")
+g2<-ggplot(data=changeDR,aes(x=ToParty))+geom_bar(aes(fill=ElectType))+
+  theme_bw()+scale_fill_brewer(palette="Set2")+
+  ggtitle("Party Changes by Election Type")+#theme(legend.position = "none")+
+  labs(x="Party Changed To",y="Number of Changes (thousands of voters)",fill="Election Type",
+       subtitle = "Only Considering Democrat and Republican")+
+  scale_y_continuous(breaks=seq(0,350000,50000),labels=as.character(seq(0,350,50)))
+plot_grid(c1,g2,nrow=1,rel_widths = c(2.5,1),labels=c("A","B"))
+```
+
+First we look at all the combinations of changes from a party to a new party. We see changes over time with presidential election years, denoted by dotted lines, show larger spikes in changes than midterm years which show larger spikes than quarter term years (Figure \@ref(fig:tofromyear) Plots A and B). This could be due to the generally larger voter turnout for presidential elections. We also see that most people change directly between Democratic and Republican with very few voters being affiliated with or switching to Libertarian or Independent comparatively (Figure \@ref(fig:tofromyear) Plot A). These seems reasonable based on the way our two-party system is structured.
+
+
+```{r ch3, fig.width=15,fig.height=6,echo=F,fig.cap="Party changes over election years considering both datasets, including and exlcuding consideration for Independents and Libertarians"}
+colorstoparty<-c("dodgerblue","darkorchid4","darkgoldenrod3","firebrick3") #colors for change to parties
+c2<-graphoveryear(changes,changes$ToParty,
+                  "Party Registration Changes in Pennsylvania by Party Changed To",
+                  "Party Changes To")+scale_color_manual(values=colorstoparty)+
+  labs(subtitle = "Only Considering Democrat, Republican, Liberatarian, and Indepedent")
+
+c3<-graphoveryear(changeDR, changeDR$ToParty,
+                  "Party Registration Changes over Time in Pennsylvania",
+                  "Party Changed To")+
+  scale_color_manual(values=c("firebrick3","dodgerblue"))+
+  labs(subtitle = "Only Considering Democrat and Republican Affliations")
+
+#plot proportion of changes per year
+c4<-ggplot(data=changeDR%>%mutate(ElectYear=as.factor(ElectYear))%>%count(ToParty,ElectYear),
+           aes(x=ElectYear,y=n,fill=ToParty))+geom_col(position="fill")+theme_bw()+
+  scale_fill_manual(values=c("dodgerblue","firebrick3"))+
+  labs(title="Proportion of Party Changes over Time", x="Election Year",
+       y="Proportion of Years Party Changes", fill="Party Changed To",
+       subtitle ="Only Considering Democrat and Republican Affliations")
+#plot proportion of changes per year
+c5<-ggplot(data=changes%>%mutate(ElectYear=as.factor(ElectYear))%>%
+             count(ToParty,ElectYear),
+           aes(x=ElectYear,y=n,fill=ToParty))+geom_col(position="fill")+theme_bw()+
+  scale_fill_manual(values=colorstoparty)+
+  labs(title="Proportion of Party Changes over Time", x="Election Year",
+       y="Proportion of Years Party Changes", fill="Party Changed To",
+       subtitle ="Only Considering Democrat, Republican, Libertarian, and Independent")
+plot_grid(c2,c3,c5,c4,nrow=2,labels=c("A","B","C","D"))
+```
+
+Additionally, We see large spikes in voters changing affiliations to the Democrat party in 2008 for the Barack Obama election, and many changing to the Republican party in 2016 for the Donald Trump election (Figure \@ref(fig:ch3)) Plots A and B).There is also increase in number of changes over time, however this is more likely due to more data for these years. When we look at changes in party as proportions of changes in a given year, we see most years there are more changes to the Republican party than to to the Democrat party (Figure \@ref(fig:ch3) Plots C and D) with the exception of 2000, 2001, 2007, and 2008. We also see a trend in recent years, that more and more people are switching to be Independents and Libertarians than the have in the past. (Figure \@ref(fig:ch3) Plot D).
+
+
+When we look at what parties voters are changing from when they change to specific parties in Figure \@ref(fig:twowaychange), we continue to see most people switch between the two main parties. Of the voters switching to the Republican Party, 93% are coming from the Democrat party, similarly with 90% of new Democrats coming from Republicans. However, we also notice Republicans are more likely to switch to the Libertarian Party with 61% of voters switching to Libertarian coming from the Republican party compared to 35% from the Democrat Party. The difference in not quite as noticeable with Independent with 50% coming from the Democrat party and 48% from the Republican.
+
+```{r twowaychange,fig.width=7,fig.height=3,results="hide",echo=F,fig.cap="Proportion of Voters Moving from One Party to Another."}
+g3<-ggplot(data=changes%>%count(ToParty,FromParty),aes(x=ToParty,y=n,fill=FromParty))+
+  geom_col(position="fill")+theme_bw()+scale_fill_manual(values=colorstoparty)+
+  ggtitle("Proportion of Party Changes to A Party by Previous Party")+
+  labs(x="Changed Party To",y="Proportion of Those who Changed to Party",fill="Party Changed From",
+       subtitle = "Only Considering Democrat, Republican, Liberatarian, and Indepedent")
+xtabs(~ToParty+FromParty,data=changes)
+prop.table(table(changes$ToParty,changes$FromParty),margin=1)
+g3
+```
+
+```{r,echo=F,eval=F}
+table(changeDR$Age[changeDR$Age>110 | changeDR$Age<18])
+table(changes$Age[changes$Age>110 | changes$Age<18])
+```
+
+Before we consider trends by age, it is important to discuss the reliability of the Age variable. Since this was variable is calculated from the listed date of birth for each voter, this reliability is inherited from the date of birth variable. Within the changes files, we have entries claiming people as young as 10, 15, and 17 have voted and people as old as 123 and 210 have voted. While these entries have been removed, their existence calls into question the reliability of the date of birth variable.
+Within the remaining data, we find most party changes are happening between the ages of 40 and 70 with the peak in the late 50's (Figure \@ref(fig:ch2) Plots A and B). We continue to see more voters switching to Republican than Democrat, and more switching to Independent than Libertarian. When we look at the proportion of voters switching to Democratic or Republican parties per Age, we see slightly more voters switching to the Democratic party than the Republican party in age groups under 27. There are also a couple of older ages which have more switching to Democrat party than Republican party, however we should keep in mind that there are very few data points in the higher age groups.
+
+```{r ch2,fig.width=15,fig.height=8,echo=F,fig.cap="Party changes over age"}
+
+plotoverage<-function(changes,groupcol,titlestr,legendlab,addsmooth=F){
+   countbyage<-changes%>%mutate(groupvar=groupcol)%>%group_by(Age,groupvar,Party)%>%
+    arrange(Age,.by_group = T)%>%summarize(Count=n()/1000)
+   ageoverallplot<- ggplot(data=countbyage,aes(x=Age,y=Count))+
+     geom_point(aes(col=groupvar))+geom_smooth(aes(col=groupvar),se=F)+theme_bw()+
+     labs(x="Voter Age",y="Number of Changes in Party (in thousands)",
+       col=legendlab,title=titlestr)+
+     scale_x_continuous(breaks=seq(15,105,5))
+   if(addsmooth){
+     ageoverallplot<-ageoverallplot+
+       geom_smooth(aes(fill="Overall Fit Line"),se=F,lty=5,col="black")+
+       labs(fill="")
+   }
+   ageoverallplot
+}
+
+  
+age1<-plotoverage(changes[changes$Age<120 & changes$Age>18,],
+                  changes$fromtoParty[changes$Age<120 & changes$Age>18],
+                  "Party Registration Changes Across Voter Age by Party Change Category",
+                  "Party Change Type",addsmooth = F)+
+  labs(subtitle = "Only Considering Democrat, Republican, Liberatarian, and Indepedent")+
+  scale_color_manual(values=colorspartytype)
+
+age2<-plotoverage(changes[changes$Age<120 & changes$Age>18,],
+                  changes$ToParty[changes$Age<120 & changes$Age>18],
+                  "Party Registration Changes Across Voter Age by Party Changed To",
+                  "Party Changed To",addsmooth = T)+
+  labs(subtitle = "Only Considering Democrat, Republican, Liberatarian, and Indepedent")+
+  scale_color_manual(values=colorstoparty)
+
+age3<-plotoverage(changeDR[changeDR$Age<120 & changeDR$Age>18,],
+                  changeDR$fromtoParty[changeDR$Age<120 & changeDR$Age>18],
+                  "Party Registration Changes across Voter Age in Pennsylvania",
+                  "Party Change Direction",addsmooth = T)+
+  scale_color_manual(values=c("firebrick3","dodgerblue"))+
+  labs(subtitle = "Only Considering Democrat and Republican Affliations")
+
+
+age4<-ggplot(data=changeDR[changeDR$Age<120 & changeDR$Age>18,]%>%
+               mutate(Age=as.factor(Age))%>%count(ToParty,Age),
+           aes(x=Age,y=n,fill=ToParty))+
+  geom_col(position="fill")+theme_bw()+scale_fill_manual(values=c("dodgerblue","firebrick3"))+
+  labs(title="Proportion of Party Changes over Voter Age", x="Voter Age",
+       y="Proportion of Age Party Changes", fill="Party Changed To",
+       subtitle ="Only Considering Democrat and Republican Affliations")+
+  scale_x_discrete(breaks=seq(20,105,5),labels=as.character(seq(20,105,5)))
+
+
+plot_grid(plot_grid(age2,age3,nrow=1,labels=c("A","B")),age4,nrow=2,labels=c("","C"))
+
+
+```
+
+We are also interested in how many times voters change parties and find that most voters change affiliation less than four times (Table \@ref(tab:switchtab)), however 17 voters have switched parties six or more times within our data.
+
+```{r switchtab,results="asis",echo=F}
+perperson<-changes%>%group_by(IDNumber)%>%summarize(ChangesPerPerson=n())
+kable(table(perperson$ChangesPerPerson),booktabs=T,col.names = c("Number of Switches","Number of Voters"),caption="Number of changes per vote out of those who have at least one change.")%>%kable_classic()%>%add_header_above(c("Of Voters Who Changed Party Afflication"=2))%>%kable_styling(full_width=F)
+fiveormore<-perperson$IDNumber[perperson$ChangesPerPerson>5]
+```
+
+We investigate the behavior of these individuals in Figure \@ref(fig:ch1). In Plots 7 to 14 which represent 11 of the voters of interest, we see a majority of voters switch back and forth between Republican and Democrat. Some voters are switching every presidential and midterm (Plots 6 and 14). We also see some voters switching between Liberatarian and Republican in Plots 2 and 5.
+
+```{r ch1,fig.width=12,fig.height=10,echo=F,fig.cap="Behavior over time of a select few voters with higher numbers of changes in party."}
+manychanges<-changes%>%filter(IDNumber%in%fiveormore)%>%
+  mutate(PartyNum=if_else(ToParty=="DEMOCRATIC",2,
+                          if_else(ToParty=="REPUBLICAN",1,
+                                  if_else(ToParty=="LIBERTARIAN",3,4))),
+         numparty=n_distinct(ToParty),
+         AnonID=as.factor(as.numeric(as.factor(IDNumber))))%>%
+  arrange(numparty,.by_group = T)
+
+graphchangesbyperson<-function(IDNum,manychanges,numvote,i){
+  ggplot(manychanges%>%filter(IDNumber==IDNum),
+         aes(x=ElectYear,y=PartyNum))+
+    geom_point(aes(col=as.factor(PartyNum),size=2))+geom_line()+
+    scale_color_manual(values = c("1"="firebrick3","2"="dodgerblue",
+                                  "3"="darkgoldenrod3","4"="darkorchid3"))+
+    scale_y_continuous(breaks=c(1,2,3,4),
+                       labels=c("Republican","Democratic",
+                                "Libertarian","Independent"))+
+    theme_bw()+scale_x_continuous(breaks=seq(2000,2018,2))+
+    theme(legend.position = "none")+
+    ggtitle(paste("Plot ",i,": ",numvote," Voters Have This Pattern",sep=""))+
+    labs(x="Election Year",y="Party Changed to")
+}
+
+
+#c(11,6,4,10,17,13,1,2,3,5,7,8,9,12,14,15,16)
+#2,3 same
+#5,7 same
+#15,16 same
+orderpref<-c(11,6,4,10,17,13,1,2,5,8,9,12,14,16)
+p<-list()
+for(i in 1:14){
+  numvote=ifelse(orderpref[i]%in% c(14,5,1),2,1)
+  p[[i]]<-graphchangesbyperson(fiveormore[orderpref[i]],manychanges,numvote,i)
+  }
+do.call(grid.arrange,args=c(p,nrow=6))
+```
+
+
+
+
+# Appendices
+
+## Tables and Figures Appendix
+
+
+
+```{r colnamestab,echo=F, results='asis'}
+headtemp<-read.csv("headernames.csv",header = F)
+names(headtemp)<-c("Column Name","Number")
+kables(list(kable(headtemp[1:38,],row.names = F,valign='t',booktabs=T),
+            kable(headtemp[39:76,],row.names = F,valign='t',booktabs=T),
+            kable(headtemp[77:114,],row.names = F,valign='t',booktabs=T),
+            kable(headtemp[115:153,],row.names = F,valign='t',booktabs=T)), 
+       caption="Avaiable Variable in FVE files show many unnecessary columns.")%>%kable_classic()
+
+```
+
+```{r countylist,results='asis',echo=F}
+kable(list(numcounties[1:17,],numcounties[18:34,],numcounties[35:51,],
+           numcounties[52:67,]),booktabs=T,valign='t',
+      col.names = c("County","Number of Elections"),
+      caption = "List of counties and the number of elections after removing Municipal and Primary Elections")%>%
+  kable_classic()
+```
+
+
+## Code Appendix
+
+
