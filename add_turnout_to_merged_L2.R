@@ -39,8 +39,9 @@ test<-left_join(L2_mini, VF18, by=c('Voters_FirstName_2018' = 'FirstName',
                                     'Residence_Addresses_AddressLine_2018' = 'AddressLine1',
                                     'Voters_Gender_2018' = 'Gender'
                                     ))
-
-
+#save
+setwd("C:/Users/natha/Desktop/Polling Places/data")
+write.csv(test, file='L2_join_poll_turnout.csv')
 
 
 
