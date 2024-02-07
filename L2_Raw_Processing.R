@@ -15,6 +15,7 @@ get_L2_data <- function(L2_dir, filename, vars){
 #################################################################
 
 # set directories
+data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places\\data'
 L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places\\data\\VM2_PA_2019_08_23'
 # Set variable lists
 vote_vars<-c('LALVOTERID', 'General_2018_11_06')
@@ -41,7 +42,9 @@ L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-VOTEHISTORY.tab', vote_var
 L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
 # Combine L2 data
 L2demog<-left_join(L2demog, L2votehist, by = 'LALVOTERID')
-
+#### save to csv
+setwd(data_dir)
+write.csv(L2demog, 'L2PA_full.csv')
 
 
 
