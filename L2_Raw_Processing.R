@@ -75,13 +75,22 @@ match<-get_match_data(data_dir, 'joined_sheet_matched.csv',
                     c('county_pre', 'county_name', 'precinct_name', 'precinct_id'))
 
 ### Edit precinct names to match poll location file
-match$Precinct <- str_remove(match$precinct_name, pattern = '#')
+match$precinct_name <- str_remove(match$precinct_name, pattern = '#')
 ### Merge precinct and county names in L2 data frame
 L2demog$county_pre = paste0(L2demog$County,' - ',L2demog$Precinct)
-Precincts<-as.data.frame(unique(L2demog$Precinct))
-Precincts$index<-row.names(Precincts)
-match<-cbind(match, Precincts)
 
+library(fuzzyjoin)
+mini_data=stringdist_join(mini_data, match,
+                mode = 'left',
+                by='county_pre',
+                max_dist=3,
+                method = 'jw')
+
+county_pre<-as.data.frame(unique(L2demog$county_pre))
+county_pre$index<-row.names(county_pre)
+match$index<-row.names(match)
+match<-merge(match, county_pre, by='index')
+write.csv(match, 'L2_poll_precincts_mismatch.csv')
 ## merge L2 with joined_sheet on L2 precinct names
 L2demog<-left_join(L2demog, match, by='county_pre')
 ## Drop crosswalk
@@ -103,6 +112,6 @@ rm(poll)
 setwd(data_dir)
 write.csv(L2demog, 'L2PA_full.csv')
 
-mini_data <- L2demog[sample(nrow(L2demog), 100000),]
+mini_data <- L2demog[sample(nrow(L2demog), 1000),]
 
 
