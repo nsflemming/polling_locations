@@ -7,6 +7,7 @@ library(tidyverse)
 library(data.table) #read in data selectively
 library(openxlsx) #save crosstabs as excel sheet
 library(stringr) #string manipulation
+library(ggplot2) # plotting
 
 ########## Functions
 
@@ -41,7 +42,7 @@ log_reg <- function(data, dep_var, ind_vars){
   m_base <- glm(data=data, 
                 formula,
                 family = "binomial")
-  return(summary(m_base))
+  return(m_base)
 }
   
 
@@ -72,6 +73,13 @@ educ_map <- c("Less than HS Diploma - Ex Like"=1,
 model_data<-educ_to_ord(model_data, 'CommercialData_Education', educ_map)
 # Convert location category to factor
 model_data$location_category <- as.factor(model_data$location_category)
+# Convert household composition to child yes/no
+model_data$has_child <- str_detect(model_data$CommercialData_HHComposition, 'Children|children')
+# Convert religious description to religious yes/no
+model_data$religious <- model_data$Religions_Description!=""
+# Location dummy variables
+model_data$school <- model_data$location_category=='school' 
+model_data$relig_loc <- model_data$location_category=='religious' 
 ## subset data to usable size for initial testing
 mini_data <- model_data[sample(nrow(model_data), 100000),]
 
@@ -90,11 +98,45 @@ ind_vars_base <-c(
 #### Probability of turning out, location category as predictor
 ##### Base model
 ### set reference category
-model_data$location_category <- relevel(model_data$location_category, ref = "public")
+model_data$location_category <- relevel(model_data$location_category, ref = "apartment")
 # model
-log_reg(model_data, 'General_2018_11_06', ind_vars_base)
+m_base<-log_reg(model_data, 'General_2018_11_06', ind_vars_base)
 
 ### Probability of turning out, if has/lacks child and is voting at a school
+#vars
+ind_vars_child_schl <-c(
+  # var of interest
+  'has_child*school',
+  # Demographics
+  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
+  # Race
+  'EthnicGroups_EthnicGroup1Desc'
+)
+# model
+m_schl<-log_reg(model_data, 'General_2018_11_06', ind_vars_child_schl)
+m_base <- glm(data=data, 
+              formula,
+              family = "binomial")
 
 ### Probability of turning out, if gov employee and is voting at gov building
+
 ### Probability of turning out, if religious and is voting at religious building
+#vars
+ind_vars_relig <-c(
+  # var of interest
+  'religious*relig_loc',
+  # Demographics
+  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
+  # Race
+  'EthnicGroups_EthnicGroup1Desc'
+)
+# model
+m_relig<-log_reg(model_data, 'General_2018_11_06', ind_vars_relig)
+summary(m_relig)
+m_base <- glm(data=model_data, 
+             General_2018_11_06~religious*relig_loc+CommercialData_Education+
+             CommercialData_EstimatedHHIncomeAmount+EthnicGroups_EthnicGroup1Desc,
+              family = "binomial")
+summary(m_base)
+
+
