@@ -75,7 +75,7 @@ match<-get_match_data(data_dir, 'joined_sheet_matched.csv',
                     c('county_pre', 'county_name', 'precinct_name', 'precinct_id'))
 
 ### Edit precinct names to match poll location file
-match$precinct_name <- str_remove(match$precinct_name, pattern = '#')
+match$county_pre <- str_remove(match$county_pre, pattern = '#')
 ### Merge precinct and county names in L2 data frame
 L2demog$county_pre = paste0(L2demog$County,' - ',L2demog$Precinct)
 
@@ -83,8 +83,7 @@ library(fuzzyjoin)
 mini_data=stringdist_join(mini_data, match,
                 mode = 'left',
                 by='county_pre',
-                max_dist=3,
-                method = 'jw')
+                max_dist=3)
 
 county_pre<-as.data.frame(unique(L2demog$county_pre))
 county_pre$index<-row.names(county_pre)
