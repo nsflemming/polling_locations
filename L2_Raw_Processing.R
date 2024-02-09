@@ -5,6 +5,8 @@ library(tidyverse)
 library(data.table) #read in L2 data selectively
 library(stringr) #string manipulation
 
+########## Functions
+
 # Read in L2 data selectively
 get_L2_data <- function(L2_dir, filename, vars){
   setwd(L2_dir)
@@ -33,7 +35,7 @@ get_poll_data <- function(poll_dir, filename, vars){
 
 
 
-#################################################################
+################################################################# Main
 
 # set directories
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places\\data'
@@ -50,6 +52,7 @@ demog_vars<-c('LALVOTERID',
               'Voters_Gender', 'Voters_Age', 'EthnicGroups_EthnicGroup1Desc',
               'Religions_Description', 'MaritalStatus_Description',
               'CommercialData_Education', 'CommercialData_HHComposition',
+              'CommercialData_EstimatedHHIncomeAmount',
               'CommercialData_LikelyUnion', 'CommercialData_OccupationGroup',
               'CommercialData_OccupationIndustry',
               #Political
@@ -70,12 +73,20 @@ rm(L2votehist)
 ### Read manually matched L2 and poll location precinct names back in
 match<-get_match_data(data_dir, 'joined_sheet_matched.csv', 
                     c('county_pre', 'county_name', 'precinct_name', 'precinct_id'))
+
+### Edit precinct names to match poll location file
+match$Precinct <- str_remove(match$precinct_name, pattern = '#')
 ### Merge precinct and county names in L2 data frame
 L2demog$county_pre = paste0(L2demog$County,' - ',L2demog$Precinct)
+Precincts<-as.data.frame(unique(L2demog$Precinct))
+Precincts$index<-row.names(Precincts)
+match<-cbind(match, Precincts)
+
 ## merge L2 with joined_sheet on L2 precinct names
 L2demog<-left_join(L2demog, match, by='county_pre')
 ## Drop crosswalk
 rm(match)
+7677867-sum(is.na(L2demog$precinct_id))
 
 ################# merge in polling place categories
 # Read in location/category data
@@ -86,10 +97,12 @@ L2demog <- left_join(L2demog, poll, by=c('county_name', 'precinct_name'))
 ## drop location 
 rm(poll)
 
+7677867-sum(is.na(L2demog$precinct_id))
+
 ################# write to csv
 setwd(data_dir)
 write.csv(L2demog, 'L2PA_full.csv')
 
-
+mini_data <- L2demog[sample(nrow(L2demog), 100000),]
 
 
