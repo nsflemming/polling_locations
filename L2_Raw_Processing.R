@@ -111,6 +111,6 @@ rm(poll)
 setwd(data_dir)
 write.csv(L2demog, 'L2PA_full.csv')
 
-mini_data <- L2demog[sample(nrow(L2demog), 1000),]
+mini_data <- L2demog[sample(nrow(L2demog), 100000),]
 
 
