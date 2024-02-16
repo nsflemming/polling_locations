@@ -78,22 +78,25 @@ match<-get_match_data(data_dir, 'joined_sheet_matched.csv',
 match$county_pre <- str_remove(match$county_pre, pattern = '#')
 ### Merge precinct and county names in L2 data frame
 L2demog$county_pre = paste0(L2demog$County,' - ',L2demog$Precinct)
-
-library(fuzzyjoin)
-mini_data=stringdist_join(mini_data, match,
-                mode = 'left',
-                by='county_pre',
-                max_dist=3)
-
+### Combine L2 and poll location county precinct sheets
 county_pre<-as.data.frame(unique(L2demog$county_pre))
 county_pre$index<-row.names(county_pre)
 match$index<-row.names(match)
-match<-merge(match, county_pre, by='index')
+match<-left_join(match, county_pre, by='index')
 write.csv(match, 'L2_poll_precincts_mismatch.csv')
+######## Align county_precinct names manually
+## read back in
+match_aligned<-read.csv('L2_poll_precincts_aligned.csv')
+#rename columns
+match_aligned<-match_aligned%>%
+  rename(L2_county_pre = unique.L2demog.county_pre.)
+L2demog<-rename(L2demog, L2_county_pre = county_pre)
+
 ## merge L2 with joined_sheet on L2 precinct names
-L2demog<-left_join(L2demog, match, by='county_pre')
+L2demog<-left_join(L2demog, match_aligned, by='L2_county_pre')
 ## Drop crosswalk
 rm(match)
+rm(match_aligned)
 7677867-sum(is.na(L2demog$precinct_id))
 
 ################# merge in polling place categories
@@ -104,8 +107,9 @@ poll <- get_poll_data(data_dir, 'polllocation_structure_and_keyword.csv',
 L2demog <- left_join(L2demog, poll, by=c('county_name', 'precinct_name'))
 ## drop location 
 rm(poll)
-
 7677867-sum(is.na(L2demog$precinct_id))
+##### Drop extraneous variables
+L2demog <- subset(L2demog, select = -c(X, index))
 
 ################# write to csv
 setwd(data_dir)
