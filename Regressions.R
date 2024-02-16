@@ -44,7 +44,14 @@ log_reg <- function(data, dep_var, ind_vars){
                 family = "binomial")
   return(m_base)
 }
-  
+
+## Save model result summary
+write_summ <- function(results_dir, model_name, model){
+  setwd(results_dir)
+  sink(file=paste0("RegressionSummary_", model_name,".txt"))
+  print(summary(model))
+  sink()
+}
 
 
 
@@ -93,23 +100,33 @@ model_data$Parties_Description <- as.factor(model_data$Parties_Description)
 model_data$has_child <- str_detect(model_data$CommercialData_HHComposition, 'Children|children')
 # Convert religious description to know religious yes/no, set blank to no
 model_data$known_religious <- model_data$Religions_Description!=""
-# Convert gender to religious M/F, set blank to missing
+# Convert gender to M/F, set blank to missing
 model_data$Voters_Gender <- ifelse(model_data$Voters_Gender=="",NA,model_data$Voters_Gender)
 ## Create Location dummy variables
 model_data$school <- model_data$location_category=='school' 
 model_data$relig_loc <- model_data$location_category=='religious' 
 model_data$justice_loc <- model_data$location_category=='justice' 
-# Create black dummy variable
-## most probably race category
-model_data_sub<-model_data[,c('pred.whi_2018', 'pred.bla_2016', 'pred.his_2016',
+model_data$pub_loc <- model_data$location_category=='public' 
+### Create black dummy variable
+## most probable race category
+model_data_sub<-model_data[,c('pred.whi_2018', 'pred.bla_2018', 'pred.his_2018',
                               'pred.asi_2018', 'pred.oth_2018')]
 model_data <- mutate(model_data, pred_race = names(model_data_sub)[max.col(model_data_sub)])
 model_data$pred_black<-ifelse(model_data$pred_race=='pred.bla_2018', TRUE, FALSE)
 model_data$pred_race<-as.factor(model_data$pred_race)
-## subset data to usable size for initial testing
+### Create known government employee dummy variable
+model_data$known_gov_emp <- ifelse(model_data$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
+### Create known Republican dummy variable
+model_data$known_repub <- ifelse(model_data$Parties_Description=="Republican",TRUE,FALSE)
+
+## subset data for initial testing
 mini_data <- model_data[sample(nrow(model_data), 100000),]
 
 #### Regressions
+### set reference categories
+model_data$location_category <- relevel(model_data$location_category, ref = "apartment")
+model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
+model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi_2018")
 ## Sets of variables
 ind_vars_base <-c(
   # Demographics
@@ -124,10 +141,6 @@ ind_vars_base <-c(
 ### Logistic Regression
 #### Probability of turning out, location category as predictor
 ##### Base model
-### set reference categories
-model_data$location_category <- relevel(model_data$location_category, ref = "apartment")
-model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
-model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi_2018")
 # model
 m_base<-log_reg(model_data, 'General_2018_11_06', ind_vars_base)
 summary(m_base)
@@ -146,12 +159,14 @@ ind_vars_child_schl <-c(
 # model
 m_schl<-log_reg(model_data, 'General_2018_11_06', ind_vars_child_schl)
 summary(m_schl)
+#save results
+write_summ(results_dir, 'school', m_schl)
 
 ### Probability of turning out, if gov employee and is voting at gov building
 #vars
 ind_vars_gov_emp <-c(
   # var of interest
-  'has_child*school',
+  'known_gov_emp*pub_loc',
   # Demographics
   'Voters_Gender', 'Voters_Age', 'Parties_Description',
   'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
@@ -161,6 +176,42 @@ ind_vars_gov_emp <-c(
 # model
 m_gov<-log_reg(model_data, 'General_2018_11_06', ind_vars_gov_emp)
 summary(m_gov)
+#save results
+write_summ(results_dir, 'gov_employees', m_gov)
+
+### Probability of turning out, if known_republican and is voting at religious building
+#vars
+ind_vars_repub <-c(
+  # var of interest
+  'known_repub*relig_loc',
+  # Demographics
+  'Voters_Gender', 'Voters_Age',
+  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
+  # Race
+  'pred_race'
+)
+# model
+m_repub<-log_reg(model_data, 'General_2018_11_06', ind_vars_repub)
+summary(m_repub)
+#save results
+write_summ(results_dir, 'repub_relig', m_repub)
+
+### Probability of turning out, if known_republican and is voting at a public building
+#vars
+ind_vars_repub2 <-c(
+  # var of interest
+  'known_repub*pub_loc',
+  # Demographics
+  'Voters_Gender', 'Voters_Age',
+  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
+  # Race
+  'pred_race'
+)
+# model
+m_repub2<-log_reg(model_data, 'General_2018_11_06', ind_vars_repub2)
+summary(m_repub2)
+#save results
+write_summ(results_dir, 'repub_pub', m_repub2)
 
 ### Probability of turning out, if known_religious and is voting at religious building
 #vars
@@ -176,6 +227,8 @@ ind_vars_relig <-c(
 # model
 m_relig<-log_reg(model_data, 'General_2018_11_06', ind_vars_relig)
 summary(m_relig)
+#save results
+write_summ(results_dir, 'relig', m_relig)
 
 ### Probability of turning out, if black and voting at justice system building
 #vars
@@ -189,3 +242,9 @@ ind_vars_blk_just <-c(
 # model
 m_blk<-log_reg(model_data, 'General_2018_11_06', ind_vars_blk_just)
 summary(m_blk)
+#save results
+write_summ(results_dir, 'black', m_blk)
+
+
+
+
