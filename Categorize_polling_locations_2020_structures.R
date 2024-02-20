@@ -13,7 +13,7 @@ rep_str <- c(' STREET'=' ST', ' ROAD'=' RD', ' AVENUE'=' AVE', ' DRIVE'=' DR',
              ' NORTH'=' N', ' SOUTH'=' S', ' EAST'=' E', ' WEST'=' W')
 
 #define a functions
-## processing structure data
+## processing structure data, get just PA, create address, add tag with structure type
 process_struct_data<-function(df, street_var, city_var, state_var, zip_var, structure_name){
   df<-df %>%
     # JUST PA
@@ -125,10 +125,10 @@ nat_map<-read.csv('nat_map_PA.csv')
 # 740: Emergency response and law enforcement
 ##    01: ambulance service
 ##    26: fire station/EMS
-##    34: Law enforcement
+##    34: Law enforcement #
 ##    36: prison
 # 780: mail and shipping
-##    06: post office
+##    06: post office #
 # 800: health and medicine
 ##    12: Hospital/medical center
 # 820: Public attractions and landmark buildings
@@ -145,9 +145,9 @@ nat_map<-read.csv('nat_map_PA.csv')
 ##    06: State Capitol
 ##    08: US Supreme court
 ##    10: State Supreme Court
-##    11: Court House
+##    11: Court House #
 ##    23: headquarters
-##    33: ranger station
+##    33: ranger station #
 ##    42: white house
 ##    44: City/town hall
 
@@ -160,8 +160,8 @@ nat_map2$fcode<-nat_map$fcode
 nat_map2$ftype<-nat_map$ftype
 ## code buildings
 location.type <- c(school=730)
-location.code <- c(public=74026, justice=74034, postoffice=78006,
-                   justice=83011, rangerstation=83033, public=83044)
+location.code <- c(public=74026, justice=74034, other=78006,
+                   justice=83011, other=83033, public=83044)
 nat_map2$location_category <- names(location.type)[match(nat_map2$ftype, location.type)]
 nat_map2$location_category <- names(location.code)[match(nat_map2$fcode, location.code)]
 ## drop ftype and fcode
@@ -179,8 +179,7 @@ structures<-structures%>%
          public=as.numeric(str_detect(location_category, 'public')),
          justice=as.numeric(str_detect(location_category, 'justice')),
          allegh_pub=as.numeric(str_detect(location_category, 'allegh_pub')),
-         postoffice=as.numeric(str_detect(location_category, 'postoffice')),
-         rangerstation=as.numeric(str_detect(location_category, 'rangerstation')),
+         other=as.numeric(str_detect(location_category, 'other')),
          library=as.numeric(str_detect(location_category, 'library')))
 #remove uncategorized structures
 structures<-structures[complete.cases(structures),]
@@ -195,14 +194,28 @@ write.csv(polltest, 'structure_matrix.csv')
 polltest<-polltest%>%
   group_by(address, precinct_id)%>%
   mutate(location_count = sum(across(c(religious,school,public,
-                                           justice,postoffice,
-                                           rangerstation,allegh_pub,library))))
-#change locations with two categories to 'multiple' to check missingness
+                                           justice,other,allegh_pub,library))))%>%
+  ungroup()
+
+###### Create categories for multicategory locations
+### change locations with multiple categories to 'multiple' as a default
 polltest$location_category[polltest$location_count>1]<-'multiple'
+###  Create police stations/townhalls and sunday schools flags
+polltest<-polltest%>%
+  # Group rows by polling location
+  group_by(address, precinct_id)%>%
+  # Sum flags for categories
+  mutate(public_justice = sum(across(c(public,justice))),
+         religious_school = sum(across(c(religious,school))))%>%
+  ungroup()
+## Add to category variable
+polltest$location_category[polltest$public_justice>1]<-'public_justice'
+polltest$location_category[polltest$religious_school>1]<-'religious_school'
+
 #remove individual categories and location count
 polltest<-subset(polltest, select=-c(religious,school,public,
-                                     justice,postoffice,
-                                     rangerstation,allegh_pub,library))
+                                     justice,other,allegh_pub,library,
+                                     public_justice, religious_school))
 #remove duplicates 
 polltest<-unique(polltest)
 ##(still have extra rows for some reason)
