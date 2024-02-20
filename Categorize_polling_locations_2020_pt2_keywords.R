@@ -202,17 +202,18 @@ polltest<-polltest%>%
   mutate(location_category = case_when(mult_indx==1&is.na(location_category) ~ 'multiple',
                                        lib_indx==1&is.na(location_category) ~ 'library',
                                        gov_fire_indx==1&is.na(location_category) ~ 'public',
-                                       cent_indx==1&is.na(location_category) ~ 'reccenter',
+                                       cent_indx==1&is.na(location_category) ~ 'other',
+                                       relig_indx==1&schl_indx==1&is.na(location_category) ~ 'religious_school',
                                        relig_indx==1&is.na(location_category) ~ 'religious',
                                        schl_indx==1&is.na(location_category) ~ 'school',
-                                       apt_indx==1&is.na(location_category) ~ 'apartment',
-                                       club_indx==1&is.na(location_category) ~ 'club',
-                                       vet_indx==1&is.na(location_category) ~ 'veteran',
-                                       sen_indx==1&is.na(location_category) ~ 'senior',
-                                       assc_indx==1&is.na(location_category) ~ 'association',
-                                       sport_indx==1&is.na(location_category) ~ 'sport',
-                                       milit_indx==1&is.na(location_category) ~ 'military',
-                                       union_indx==1&is.na(location_category) ~ 'union',
+                                       apt_indx==1&is.na(location_category) ~ 'other',
+                                       club_indx==1&is.na(location_category) ~ 'other',
+                                       vet_indx==1&is.na(location_category) ~ 'other',
+                                       sen_indx==1&is.na(location_category) ~ 'other',
+                                       assc_indx==1&is.na(location_category) ~ 'other',
+                                       sport_indx==1&is.na(location_category) ~ 'other',
+                                       milit_indx==1&is.na(location_category) ~ 'other',
+                                       union_indx==1&is.na(location_category) ~ 'other',
                                        othr_indx==1&is.na(location_category) ~ 'other',
                                        .default = location_category)) %>%
   #remove columns
@@ -222,7 +223,8 @@ polltest<-polltest%>%
 
 
 #calc missingness by checking which addresses are in structure list
-sum(is.na(polltest$location_category))/9262 #7.32% missing
+sum(is.na(polltest$location_category))/9156 #9.4% missing
+
 ####### save to csv
 #set directory
 setwd('C:/Users/natha/Desktop/Polling Places/data')
