@@ -80,8 +80,21 @@ demog_vars<-c('LALVOTERID',
 # Read in data
 L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-VOTEHISTORY.tab', vote_vars)
 L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+## race estimates
+setwd(data_dir)
+load('PA_2016_race.Rdata')
+race16<-df.pred
+load('PA_2017_race.Rdata')
+race17<-df.pred
+load('PA_2018_race.Rdata')
+race18<-df.pred
+rm(df.pred)
 # Combine L2 data
 L2demog<-left_join(L2demog, L2votehist, by = 'LALVOTERID')
+## merge in race estimates
+L2demog<-left_join(L2demog, race16, by='LALVOTERID')
+L2demog<-left_join(L2demog, race17, by='LALVOTERID')
+L2demog<-left_join(L2demog, race18, by='LALVOTERID')
 ### drop voterhistory
 rm(L2votehist)
 

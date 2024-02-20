@@ -18,8 +18,6 @@ binarize_vote <- function(data, vote_var, yes_vote_value){
 }
 
 
-
-
 ## Logistic regression
 log_reg <- function(data, dep_var, ind_vars){
   ind_vars_coll <- paste(ind_vars, collapse = '+')
@@ -48,17 +46,6 @@ plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
 # read in data
 setwd(data_dir)
 model_data<-read.csv('L2PA_full.csv')
-load('PA_2016_race.Rdata')
-race16<-df.pred
-load('PA_2017_race.Rdata')
-race17<-df.pred
-load('PA_2018_race.Rdata')
-race18<-df.pred
-rm(df.pred)
-## merge in race estimates
-model_data<-left_join(model_data, race16, by='LALVOTERID')
-model_data<-left_join(model_data, race17, by='LALVOTERID')
-model_data<-left_join(model_data, race18, by='LALVOTERID')
 
 # Convert vote to binary
 model_data <- binarize_vote(model_data, 'General_2018_11_06', 'Y')
