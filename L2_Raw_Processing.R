@@ -159,6 +159,7 @@ L2demog<-educ_to_ord(L2demog, 'CommercialData_Education', educ_map)
 L2demog$location_category <- as.factor(L2demog$location_category)
 # Convert parties to factor
 L2demog$Parties_Description <- as.factor(L2demog$Parties_Description)
+
 ## Create Binary Variables
 # Convert household composition to child yes/no
 L2demog$has_child <- str_detect(L2demog$CommercialData_HHComposition, 'Children|children')
@@ -168,8 +169,8 @@ L2demog$known_religious <- L2demog$Religions_Description!=""
 L2demog$Voters_Gender <- ifelse(L2demog$Voters_Gender=="",NA,L2demog$Voters_Gender)
 ## Create Location dummy variables
 L2demog$school <- L2demog$location_category=='school' 
-L2demog$relig_loc <- L2demog$location_category=='religious' 
-L2demog$justice_loc <- L2demog$location_category=='justice' 
+L2demog$relig_loc <- (L2demog$location_category=='religious'|L2demog$location_category=='religious_school')
+L2demog$justice_loc <- (L2demog$location_category=='justice'|L2demog$location_category=='public_justice')
 L2demog$pub_loc <- L2demog$location_category=='public' 
 ### Create black dummy variable
 ## most probable race category
@@ -182,6 +183,7 @@ L2demog$pred_race<-as.factor(L2demog$pred_race)
 L2demog$known_gov_emp <- ifelse(L2demog$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
 ### Create known Republican dummy variable
 L2demog$known_repub <- ifelse(L2demog$Parties_Description=="Republican",TRUE,FALSE)
+
 
 ################# write to csv
 setwd(data_dir)
