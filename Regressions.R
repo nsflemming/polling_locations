@@ -50,15 +50,36 @@ model_data<-read.csv('L2PA_full.csv')
 # Convert vote to binary
 model_data <- binarize_vote(model_data, 'General_2018_11_06', 'Y')
 
-
 ## subset data for initial testing
 mini_data <- model_data[sample(nrow(model_data), 100000),]
 
-#### Regressions
+
 ### set reference categories
-model_data$location_category <- relevel(model_data$location_category, ref = "apartment")
+#### factorize variables and relevel
+# Location category
+model_data$location_category<-as.factor(model_data$location_category)
+model_data$location_category <- relevel(model_data$location_category, ref = "other")
+# Party
+model_data$Parties_Description <- as.factor(model_data$Parties_Description)
+## Recode extraneous parties to 'other'
+model_data$Parties_Description <- fct_collapse(model_data$Parties_Description, 
+                           Other = c('American', 'American Independent','Anarchist','Bull Moose',
+                           'Christian','Communist','Conservative','Constitution',
+                           'Constitutional','Consumer','Federalist','Free Choice',
+                           'Freedom','Green','Independence','Independent Democrat',
+                           'Independent Republican','Labor','Liberal',
+                           'Libertarian','Natural Law','Non-Partisan','Patriot',
+                           'Populist','Progressive','Prohibition','Rainbow',
+                           'Reform','Registered Independent','Right to Life',
+                           'Social Democrat','Socialist','Socialist Labor',
+                           'Taxpayers','Unknown','Whig'))
 model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
+# Race
+model_data$pred_race <- as.factor(model_data$pred_race)
 model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi_2018")
+
+### Logistic Regression
+#### Probability of turning out, location category as predictor
 ## Sets of variables
 ind_vars_base <-c(
   # Demographics
@@ -69,13 +90,11 @@ ind_vars_base <-c(
   # Polling place type
   'location_category'
 )
-
-### Logistic Regression
-#### Probability of turning out, location category as predictor
-##### Base model
-# model
+# Base model
 m_base<-log_reg(model_data, 'General_2018_11_06', ind_vars_base)
 summary(m_base)
+#save results
+write_summ(results_dir, 'base', m_base)
 
 ### Probability of turning out, if has/lacks child and is voting at a school
 #vars
