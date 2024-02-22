@@ -38,6 +38,7 @@ write_summ <- function(results_dir, model_name, model){
 
 
 
+
 ########################################################### Main
 # set directories
 data_dir <- "C:/Users/natha/Desktop/Polling Places/data"
@@ -95,6 +96,26 @@ m_base<-log_reg(model_data, 'General_2018_11_06', ind_vars_base)
 summary(m_base)
 #save results
 write_summ(results_dir, 'base', m_base)
+## Calculate and plot predicted probabilities
+plotdata<-with(model_data, data.frame(location_category=c('justice','library',
+                                                          'multiple','public',
+                                                          'public_justice','religious',
+                                                          'religious_school','school'),
+                                      Voters_Gender='M',
+                                      Voters_Age=mean(Voters_Age, na.rm=T),
+                                      Parties_Description='Republican',
+                                      CommercialData_Education=mean(CommercialData_Education, na.rm=T),
+                                      CommercialData_EstimatedHHIncomeAmount = mean(CommercialData_EstimatedHHIncomeAmount, na.rm=T),
+                                      pred_race='pred.whi_2018'))
+preds<-predict(m_schl, plotdata, type='response',se.fit=TRUE)
+predf <- preds$fit # predicted
+lower <- preds$fit - (1.96*preds$se.fit) # lower bounds
+upper <- preds$fit + (1.96*preds$se.fit) # upper bounds
+plot(1:8, predf, type="l", ylab="Predicted Probability to Vote", xlab="location", bty="n")
+lines(18:90, lower, lty=2)
+lines(18:90, upper, lty=2)
+
+
 
 ### Probability of turning out, if has/lacks child and is voting at a school
 #vars
@@ -112,6 +133,30 @@ m_schl<-log_reg(model_data, 'General_2018_11_06', ind_vars_child_schl)
 summary(m_schl)
 #save results
 write_summ(results_dir, 'school', m_schl)
+## Calculate and plot predicted probabilities
+# Create dataframe for prediction
+new_data <- expand.grid(has_child = c(TRUE,FALSE),
+                        school = c(TRUE,FALSE),
+                        Voters_Gender='M', Voters_Age=mean(model_data$Voters_Age, na.rm = T),
+                        Parties_Description='Republican',
+                        CommercialData_Education=mean(model_data$CommercialData_Education, na.rm=T),
+                        CommercialData_EstimatedHHIncomeAmount = mean(model_data$CommercialData_EstimatedHHIncomeAmount, na.rm=T),
+                        pred_race='pred.whi_2018')
+# Make predictions
+preds<-predict(m_schl, newdata=new_data, type='response', se.fit=T)
+pred_probs<-preds$fit
+pred_errs<-preds$se.fit
+# Plot predictions
+ggplot(new_data, aes(x = has_child, y = pred_probs, color = factor(school))) +
+  geom_boxplot() +
+  geom_errorbar(aes(ymin=pred_probs-1.96*pred_errs,
+                    ymax=pred_probs+1.96*pred_errs),
+                width=0.2, position=position_dodge(0.8))+
+  labs(x = "Has a child/children", y = "Predicted Probability of Turning Out", color = "Votes at a School") +
+  scale_color_discrete(name = "Votes at a School") +
+  theme_minimal()
+
+
 
 ### Probability of turning out, if gov employee and is voting at gov building
 #vars
