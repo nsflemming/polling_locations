@@ -71,13 +71,28 @@ prec_chng_list<-function(df_list){
   return(output)
 }
 
+### How many precinct's changed polling place for multiple year pairs
+#### variable names hardcoded because of dplyr
+sum_prec_chng_list<-function(data){
+  output<-data %>%
+    group_by(Years)%>%
+    mutate(NumLocChanges = sum(LocationChanged, na.rm=T),
+           PctChng = NumLocChanges/n())%>%
+    select(Years, NumLocChanges, PctChng) %>%
+    distinct()%>%
+    ungroup()
+  return(output)
+}
+
 ### How many precinct's changed polling place by county
 #### variable names hardcoded because of dplyr
 county_prec_chng<-function(data){
   output<-data %>%
     group_by(CountyName.x)%>%
-    mutate(NumLocChanges = sum(LocationChanged, na.rm=T))%>%
-    select(CountyName.x, NumLocChanges) %>%
+    mutate(NumLocChanges = sum(LocationChanged, na.rm=T),
+           num_loc = n(),
+           PctChng = NumLocChanges/num_loc)%>%
+    select(CountyName.x, NumLocChanges, num_loc, PctChng) %>%
     distinct()%>%
     ungroup()
   return(output)
@@ -88,8 +103,10 @@ county_prec_chng<-function(data){
 county_prec_chng_list<-function(data){
   output<-data %>%
     group_by(CountyName.x, Years)%>%
-    mutate(NumLocChanges = sum(LocationChanged, na.rm=T))%>%
-    select(Years, CountyName.x, NumLocChanges) %>%
+    mutate(NumLocChanges = sum(LocationChanged, na.rm=T),
+           num_loc = n(),
+           PctChng = NumLocChanges/num_loc)%>%
+    select(Years, CountyName.x, NumLocChanges, num_loc, PctChng) %>%
     distinct()%>%
     ungroup()
   return(output)
@@ -106,12 +123,16 @@ comp_addrs<-function(data1, data2, addr_var){
   ## sets of unique addresses
   addrs_set1<-unique(data1[[addr_var]])
   addrs_set2<-unique(data2[[addr_var]])
+  ## number of addresses in first and second year
+  num_addr_yr1<-length(addrs_set1)
+  num_addr_yr2<-length(addrs_set2)
   ## number of kept and dropped addresses
   kept_dropped<-addr_kept_dropped(addrs_set1, addrs_set2)
   ## number of added addresses
   added<-addr_added(addrs_set1, addrs_set2)
   # bind and return
-  output<-cbind(data.frame(years),kept_dropped, added)
+  output<-cbind(data.frame(years),kept_dropped, added, data.frame(num_addr_yr1), 
+                data.frame(num_addr_yr2))
   output[['total_change']]<-output[['num_addr_dropped']]+output[['num_addr_add']]
   output[['net_change']]<-output[['num_addr_add']]-output[['num_addr_dropped']]
   return(output)
@@ -129,9 +150,15 @@ comp_addrs_county<-function(data1, data2, addr_var){
     CountyName<-county
     addrs_set1<-unique(data1[[addr_var]][data1[['CountyName']]==county])
     addrs_set2<-unique(data2[[addr_var]][data1[['CountyName']]==county])
+    ## number of addresses in first and second year
+    num_addr_yr1<-length(addrs_set1)
+    num_addr_yr2<-length(addrs_set2)
+    ## changes
     kept_dropped<-addr_kept_dropped(addrs_set1, addrs_set2)
     added<-addr_added(addrs_set1, addrs_set2)
-    temp<-cbind(data.frame(years),data.frame(CountyName),kept_dropped, added)
+    temp<-cbind(data.frame(years),data.frame(CountyName),kept_dropped, added,
+                data.frame(num_addr_yr1), 
+                data.frame(num_addr_yr2))
     temp[['total_change']]<-temp[['num_addr_dropped']]+temp[['num_addr_add']]
     temp[['net_change']]<-temp[['num_addr_add']]-temp[['num_addr_dropped']]
     output=rbind(output,temp)
@@ -152,7 +179,7 @@ comp_addrs_list<-function(df_list){
   return(output)
 }
 
-### compare dataframes of years in a lists grouping by county
+### compare dataframes of years in a list grouping by county
 comp_addrs_list_cnty<-function(df_list){
   output<-data.frame()
   for(i in 1:(length(df_list)-1)){
@@ -189,20 +216,21 @@ overallchng_yrtoyr<-comp_addrs_list(poll_dfs)
 ## compare years by county
 countychng_yrtoyr<-comp_addrs_list_cnty(poll_dfs)
 
-#match precincts year to year and see which changed their polling location
-locchng_yrtoyr<-prec_chng(poll_loc2018, poll_loc2019)
-locchng_yrtoyr_sum<-locchng_yrtoyr
+####match precincts year to year and see which changed their polling location
 ## create separate lists before and after redistricting
 poll_dfs_1819<-list('2018'=poll_loc2018, '2019'=poll_loc2019)
 poll_dfs_2023<-list('2020'=poll_loc2020, '2021'=poll_loc2021, 
                     '2022'=poll_loc2022, '2023'=poll_loc2023)
-locchng_yrtoyr_cnty<-prec_chng_list(poll_dfs_1819)
-locchng_yrtoyr_cnty<-rbind(locchng_yrtoyr_cnty, prec_chng_list(poll_dfs_2023))
+locchng_yty_cnty<-prec_chng_list(poll_dfs_1819)
+locchng_yty_cnty<-rbind(locchng_yty_cnty, prec_chng_list(poll_dfs_2023))
 
 ## See number of changes by county and year (variable names hardcoded because of dplyr)
-precchng_yrtoyr<-county_prec_chng_list(data=locchng_yrtoyr_cnty)
+locchng_yty_cnty_sum<-county_prec_chng_list(data=locchng_yty_cnty)
+## Number of changes overall year to year
+locchng_yty_sum<-sum_prec_chng_list(locchng_yty_cnty)
+  
 
-# Plots 
+################# Plots 
 ## Number of address adds, drops, changes per year pair
 ttl_chng_plot<-overallchng_yrtoyr %>%
   pivot_longer(cols=c(num_addr_dropped, num_addr_add)) %>%
@@ -213,12 +241,50 @@ ttl_chng_plot<-overallchng_yrtoyr %>%
   scale_fill_discrete(name='',labels=c('Addresses Added', 'Addresses Dropped'))+
   theme_minimal()
 ttl_chng_plot
-## Number of location changes 
+setwd(plot_dir)
+ggsave('Changes_in_Addresses.png',ttl_chng_plot)
 
+## Number of location changes , year to year
+loc_chng_plot<-locchng_yty_sum %>%
+  ggplot(aes(x=Years, y=NumLocChanges))+
+  geom_col(fill='deepskyblue3') +
+  labs(title = 'Changes in Polling Locations Year to Year', x='Year Pairs', 
+       y='Number of Locations')+
+  theme_minimal()
+loc_chng_plot
+## Percentage of location changes , year to year
+loc_pctchng_plot<-locchng_yty_sum %>%
+  ggplot(aes(x=Years, y=PctChng))+
+  geom_col(fill='deepskyblue3') +
+  labs(title = 'Changes in Polling Locations Year to Year', x='Year Pairs', 
+       y='Proportion of Locations')+
+  scale_y_continuous(labels = scales::percent)+
+  theme_minimal()
+loc_pctchng_plot
 
-
-
-
+## Number of location changes , year to year, by county
+cnty_loc_chng_plot<-locchng_yty_cnty_sum %>%
+  ggplot(aes(fill=CountyName.x, x=CountyName.x, y=NumLocChanges))+
+  geom_bar(position='dodge',stat='identity') +
+  labs(title = 'Changes in Polling Locations Year to Year', x='County', 
+       y='Number of Locations Changed')+
+  facet_grid(rows = vars(Years))+
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_fill_discrete(name='County')
+cnty_loc_chng_plot
+## Percentage of location changes , year to year, by county
+cnty_loc_pctchng_plot<-locchng_yty_cnty_sum %>%
+  ggplot(aes(fill=CountyName.x, x=CountyName.x, y=PctChng))+
+  geom_bar(position='dodge',stat='identity') +
+  labs(title = 'Changes in Polling Locations Year to Year', x='County', 
+       y='Percentage of Locations Changed')+
+  facet_grid(rows = vars(Years))+
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_fill_discrete(name='County')+ 
+  scale_y_continuous(labels = scales::percent)
+cnty_loc_pctchng_plot
 
 
 
