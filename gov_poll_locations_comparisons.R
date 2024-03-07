@@ -192,6 +192,12 @@ comp_addrs_list_cnty<-function(df_list){
   return(output)
 }
 
+### Save plot
+save_plot<-function(plot_dir, filename, plotname, width=2000, height=1000){
+  setwd(plot_dir)
+  ggsave(filename,width=width, height=height, units = 'px', bg = "white", plot=plotname)
+}
+
 
 ##################################################
 #set directories
@@ -241,8 +247,7 @@ ttl_chng_plot<-overallchng_yrtoyr %>%
   scale_fill_discrete(name='',labels=c('Addresses Added', 'Addresses Dropped'))+
   theme_minimal()
 ttl_chng_plot
-setwd(plot_dir)
-ggsave('Changes_in_Addresses.png',ttl_chng_plot)
+save_plot(plot_dir, 'Changes_in_Addresses.png', ttl_chng_plot)
 
 ## Number of location changes , year to year
 loc_chng_plot<-locchng_yty_sum %>%
@@ -252,6 +257,7 @@ loc_chng_plot<-locchng_yty_sum %>%
        y='Number of Locations')+
   theme_minimal()
 loc_chng_plot
+save_plot(plot_dir, 'Changes_in_location.png', loc_chng_plot)
 ## Percentage of location changes , year to year
 loc_pctchng_plot<-locchng_yty_sum %>%
   ggplot(aes(x=Years, y=PctChng))+
@@ -261,6 +267,7 @@ loc_pctchng_plot<-locchng_yty_sum %>%
   scale_y_continuous(labels = scales::percent)+
   theme_minimal()
 loc_pctchng_plot
+
 
 ## Number of location changes , year to year, by county
 cnty_loc_chng_plot<-locchng_yty_cnty_sum %>%
@@ -273,6 +280,9 @@ cnty_loc_chng_plot<-locchng_yty_cnty_sum %>%
   theme(axis.text.x=element_text(angle = 90, vjust = 0.5, hjust=1))+
   scale_fill_discrete(name='County')
 cnty_loc_chng_plot
+save_plot(plot_dir, 'Changes_in_location_by_county.png', cnty_loc_chng_plot,
+          width=4000, height=2000)
+
 ## Percentage of location changes , year to year, by county
 cnty_loc_pctchng_plot<-locchng_yty_cnty_sum %>%
   ggplot(aes(fill=CountyName.x, x=CountyName.x, y=PctChng))+
@@ -285,7 +295,8 @@ cnty_loc_pctchng_plot<-locchng_yty_cnty_sum %>%
   scale_fill_discrete(name='County')+ 
   scale_y_continuous(labels = scales::percent)
 cnty_loc_pctchng_plot
-
+save_plot(plot_dir, 'Changes_in_location_by_county_percentage.png', cnty_loc_pctchng_plot,
+          width=4000, height=2000)
 
 
 
