@@ -249,6 +249,21 @@ ttl_chng_plot<-overallchng_yrtoyr %>%
 ttl_chng_plot
 save_plot(plot_dir, 'Changes_in_Addresses.png', ttl_chng_plot)
 
+## Number of address adds, drops, changes per year pair, by county
+cnty_chng_plot<-countychng_yrtoyr %>%
+  pivot_longer(cols=c(num_addr_dropped, num_addr_add))%>%
+  ggplot(aes(fill=name, x=CountyName, y=value))+
+  geom_bar(position='stack',stat='identity') +
+  labs(title = 'Changes in Addresses Year to Year', x='County', 
+       y='Number of Addresses Changed')+
+  facet_grid(rows = vars(years))+
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_fill_discrete(name='',labels=c('Addresses Added', 'Addresses Dropped'))
+cnty_chng_plot
+save_plot(plot_dir, 'Changes_in_addresses_by_county.png', cnty_chng_plot,
+          width=4000, height=2000)
+
 ## Number of location changes , year to year
 loc_chng_plot<-locchng_yty_sum %>%
   ggplot(aes(x=Years, y=NumLocChanges))+
@@ -267,7 +282,8 @@ loc_pctchng_plot<-locchng_yty_sum %>%
   scale_y_continuous(labels = scales::percent)+
   theme_minimal()
 loc_pctchng_plot
-
+save_plot(plot_dir, 'Changes_in_location_percentage.png', loc_pctchng_plot,
+          width=4000, height=2000)
 
 ## Number of location changes , year to year, by county
 cnty_loc_chng_plot<-locchng_yty_cnty_sum %>%
