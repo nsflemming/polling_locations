@@ -45,8 +45,7 @@ dollar_to_num <- function(data, inc_var){
 ## Convert education to ordinal
 educ_to_ord <- function(data, educ_var, mapping){
   data[[educ_var]] <- mapping[as.character(data[[educ_var]])]
-  #map blank/now missing to 0?
-  #data[[educ_var]][is.na(data[[educ_var]])] <- 0
+  #leave blank = missing/unknown
   return(data)
 }
 
@@ -66,7 +65,9 @@ demog_vars<-c('LALVOTERID',
               'County','Voters_FIPS','Precinct',
               #Demographics
               'Voters_Gender', 'Voters_Age', 'EthnicGroups_EthnicGroup1Desc',
-              'Religions_Description', 'MaritalStatus_Description',
+              'Residence_Families_HHCount', 'Residence_HHGender_Description',
+              'Religions_Description', 
+              ###'MaritalStatus_Description',
               'CommercialData_Education', 'CommercialData_HHComposition',
               'CommercialData_EstimatedHHIncomeAmount',
               'CommercialData_LikelyUnion', 'CommercialData_OccupationGroup',
