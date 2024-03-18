@@ -1,0 +1,310 @@
+#Nathaniel Flemming 15 3 24
+### categorizing polling locations using structure data
+### polling location lists provided by state government
+
+library(dplyr)
+library(stringr) #string manipulation
+
+
+#define functions
+
+## create address from address components
+make_address <- function(data, num, direction, street, street_type, city,
+                         state, postcode){
+  data[['address']]<-paste0(data[[num]], ' ',data[[direction]], ' ',data[[street]], 
+                            ' ',data[[street_type]], ', ',data[[city]], ', ', 
+                            data[[state]],' ', data[[postcode]])
+  #replace any douple spaces created by a missing direction with a single space
+  data[['address']]<-str_replace_all(data[['address']], '  ', ' ')
+  return(data)
+}
+
+## read in location data
+get_poll <- function(dir, filename, num, direction, street, street_type, city,
+                     state, postcode){
+  setwd(dir)
+  data <- read.csv(filename)
+  data<-make_address(data, num, direction, street, street_type, city, state, postcode)
+  return(data)
+}
+
+## processing structure data, get just PA, create address, add tag with structure type
+process_struct_data<-function(df, street_var, city_var, state_var, zip_var, structure_name){
+  df<-df %>%
+    # JUST PA
+    filter(df[[state_var]]=='PA')
+  ### construct and trim to addresses and indicator
+  df$address<-toupper(paste0(df[[street_var]],', ',df[[city_var]],
+                             ', ',df[[state_var]],' ',substr(df[[zip_var]],1,5)))
+  df$address<-lapply(df$address, toString)
+  df$location_category=structure_name
+  df<-df%>%
+    select(address, location_category)
+  df <- as.data.frame(lapply(df, unlist))
+}
+
+## get and process structure data fully
+get_process_struct_data<-function(dir, df_name, street_var='ADDRESS', city_var='CITY', 
+                                  state_var='STATE', zip_var='ZIPCODE', structure_name,
+                                  rep_str=c(' STREET'=' ST', ' ROAD'=' RD', 
+                                            ' AVENUE'=' AVE', ' DRIVE'=' DR', 
+                                            ' BOULEVARD'=' BLVD',' NORTH'=' N', 
+                                            ' SOUTH'=' S', ' EAST'=' E', ' WEST'=' W')){
+  setwd(dir)
+  data<-read.csv(df_name)
+  ### construct and trim to addresses and indicator
+  #data<-process_struct_data(data, street_var, city_var, state_var, zip_var, 'public')
+  data<-data %>%
+    # JUST PA
+    filter(data[[state_var]]=='PA')
+  ### construct and trim to addresses and indicator
+  data[['address']]<-toupper(paste0(data[[street_var]],', ',data[[city_var]],
+                             ', ',data[[state_var]],' ',substr(data[[zip_var]],1,5)))
+  data[['address']]<-lapply(data[['address']], toString)
+  data[['location_category']]=structure_name
+  data<-data%>%
+    select(address, location_category)
+  data <- as.data.frame(lapply(data, unlist))
+  return(data)
+}
+
+## processing national map data (keep fcode and ftype)
+process_nat_map_data<-function(df, street_var, city_var, state_var, zip_var, structure_name){
+  ### construct and trim to addresses and indicator
+  df$address<-toupper(paste0(df[[street_var]],', ',df[[city_var]],
+                             ', ',df[[state_var]],' ',substr(df[[zip_var]],1,5)))
+  df$address<-lapply(df$address, toString)
+  df$location_category=structure_name
+  df<-df%>%
+    select(address, location_category, fcode, ftype)
+  df <- as.data.frame(lapply(df, unlist))
+}
+
+## combine education dataframes
+get_educ_data <- function(dir, filenames){
+  setwd(dir)
+  i=1
+  for(file in filenames){
+    assign(paste0('educ',i),read.csv(file))
+    i=i+1
+  }
+  ### combine educations buildings
+  education = rbind(educ1, educ2, educ3)
+  return(education)
+}
+
+### ftype to structure type
+###     fcode to structure (more specific category, w/in type)
+# 730: education
+##    02: school
+##    03: school, elementary
+##    04: school, middle
+##    05: school, high
+##    06: school, college/university
+##    07: school, technical/trade
+# 740: Emergency response and law enforcement
+##    01: ambulance service
+##    26: fire station/EMS
+##    34: Law enforcement #
+##    36: prison
+# 780: mail and shipping
+##    06: post office #
+# 800: health and medicine
+##    12: Hospital/medical center
+# 820: Public attractions and landmark buildings
+##    07: Cabin
+##    08: Campground
+##    10: Cemetery
+##    18: Historic site/point of interest
+##    34: National Symbol/Monument
+##    40: Picnic area
+##    47: Trailhead
+##    48: Visitor/information center
+# 830: government and military
+##    04: US Capitol
+##    06: State Capitol
+##    08: US Supreme court
+##    10: State Supreme Court
+##    11: Court House #
+##    23: headquarters
+##    33: ranger station #
+##    42: white house
+##    44: City/town hall
+
+
+
+
+
+#############################################
+
+#set directories
+struct_dir <- 'C:/Users/natha/Desktop/Polling Places/data/Structures'
+poll_dir <- 'C:/Users/natha/Desktop/Polling Places/data/gov_poll_places'
+plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
+
+## string for abbreviating street names
+rep_str <- c(' STREET'=' ST', ' ROAD'=' RD', ' AVENUE'=' AVE', ' DRIVE'=' DR', 
+             ' BOULEVARD'=' BLVD',
+             ' NORTH'=' N', ' SOUTH'=' S', ' EAST'=' E', ' WEST'=' W')
+
+# get poll location data and process
+filenames<-c('Polling Place List 20180514.csv','Polling Place List 20190513.csv',
+             'Polling Place List 20201102.csv','Polling Place List 20211101.csv',
+             'Polling Place List 20220506.csv','Polling Place List 20231106.csv')
+## Read in and process multiple location files
+for(file in filenames){
+    assign(paste0('poll_loc',substr(file,20,23)),
+           get_poll(poll_dir, file, num='HouseNum', direction='PrefixDirection',
+                    street='Street', street_type = 'StreetType',city='City',
+                    state="State", postcode='PostalCode'))
+}
+
+##### Structure data
+#reset directory
+setwd(struct_dir)
+
+## places of worship
+worship<-get_process_struct_data(struct_dir, 'All_Places_Of_Worship_HIFLD.csv',
+                                 street_var = 'STREET', city_var='CITY',
+                                 state_var='STATE', zip_var = "ZIP", 
+                                 structure_name = 'religious')
+
+## Education buildings
+educ_files<-c('Educational_Structures_NGDA_2023/Colleges_Universities_0.csv',
+              'Educational_Structures_NGDA_2023/Schools_2.csv',
+              'Educational_Structures_NGDA_2023/Technical_Trade_Schools_1.csv')
+education<-get_educ_data(struct_dir, educ_files)
+### construct and trim to addresses and indicator
+education<-process_struct_data(education, 'ADDRESS', 'CITY', 'STATE', 'ZIPCODE', 'school')
+### abbreviate street names
+education$address<-str_replace_all(education$address, rep_str)
+### private schools
+education_priv<-read.csv('Private_Schools_HIFLD.csv')
+### construct and trim to addresses and indicator
+education_priv<-process_struct_data(education_priv, 'ADDRESS', 'CITY', 'STATE', 'ZIP', 'school')
+### abbreviate street names
+education_priv$address<-str_replace_all(education_priv$address, rep_str)
+### rbind public and private schools, remove duplicates
+education = rbind(education, education_priv)
+education <- education %>%
+  distinct()
+
+## fire stations
+firestations<-get_process_struct_data(struct_dir, 'Fire_Stations_HIFLD.csv',
+                                 structure_name = 'public')
+
+## law enforcement
+policestations<-get_process_struct_data(struct_dir, 
+                                        'Law_Enforcement_Structures_NGDA_2023/Police_Stations_0.csv',
+                                      structure_name = 'justice')
+
+## libraries
+libraries<-get_process_struct_data(struct_dir, 'Libraries_HIFLD_19_4_23.csv',
+                                   street_var = 'Address', city_var = 'City',
+                                   state_var = 'State', zip_var = 'ZipCode',
+                                        structure_name = 'library')
+
+################# county specific structure data
+allegheny<-read.csv('AlleghenyCounty_publicbldgs2023.csv')
+### construct and trim to addresses and indicator
+allegheny$STATE<-'PA'
+allegheny<-process_struct_data(allegheny, 'address', 'city', 'STATE', 'zipcode', 'allegh_pub')
+### abbreviate street names
+allegheny$address<-str_replace_all(allegheny$address, rep_str)
+
+################ national map data
+nat_map<-read.csv('nat_map_PA.csv')
+#create address variable
+nat_map2<-process_nat_map_data(nat_map, 'address', 'city', 'state', 'zipcode', 'placeholder')
+### abbreviate street names
+nat_map2$address<-str_replace_all(nat_map2$address, rep_str)
+#add ftype and fcode to data frame
+nat_map2$fcode<-nat_map$fcode
+nat_map2$ftype<-nat_map$ftype
+## code buildings
+location.type <- c(school=730)
+location.code <- c(public=74026, justice=74034, public=78006,
+                   justice=83011, other=83033, public=83044)
+nat_map2$location_category <- names(location.type)[match(nat_map2$ftype, location.type)]
+nat_map2$location_category <- names(location.code)[match(nat_map2$fcode, location.code)]
+## drop ftype and fcode
+nat_map2<-subset(nat_map2, select = -c(ftype,fcode))
+
+###################### merge poll locations and structures
+## one building can be multiple categories
+### mark whether building is a category
+### since issue with duplication one building is on multiple lists
+structures<-rbind(worship, education, firestations, policestations, allegheny, 
+                  nat_map2, libraries)
+structures<-structures%>%
+  mutate(religious=as.numeric(str_detect(location_category, 'religious')),
+         school=as.numeric(str_detect(location_category, 'school')),
+         public=as.numeric(str_detect(location_category, 'public')),
+         justice=as.numeric(str_detect(location_category, 'justice')),
+         allegh_pub=as.numeric(str_detect(location_category, 'allegh_pub')),
+         other=as.numeric(str_detect(location_category, 'other')),
+         library=as.numeric(str_detect(location_category, 'library')))
+#remove uncategorized structures
+structures<-structures[complete.cases(structures),]
+
+############# merge
+### put dataframes into a list
+poll_dfs<-list('2018'=poll_loc2018, '2019'=poll_loc2019,
+               '2020'=poll_loc2020, '2021'=poll_loc2021, 
+               '2022'=poll_loc2022, '2023'=poll_loc2023)
+for(i in seq_along(poll_dfs)){
+  assign(paste0('test',names(poll_dfs)[i]),
+         left_join(poll_dfs[[i]], structures, 'address', relationship='many-to-many'))
+}
+
+polltest<-left_join(poll, structures, 'address', relationship='many-to-many')
+#remove duplicates
+polltest<-unique(polltest)
+## save a copy of structure categorization matrix
+write.csv(polltest, 'structure_matrix.csv')
+#location category count instead of location category to see what's multiple coded
+polltest<-polltest%>%
+  group_by(address, precinct_id)%>%
+  mutate(location_count = sum(across(c(religious,school,public,
+                                       justice,other,allegh_pub,library))))%>%
+  ungroup()
+
+###### Create categories for multicategory locations
+### change locations with multiple categories to 'multiple' as a default
+polltest$location_category[polltest$location_count>1]<-'multiple'
+###  Create police stations/townhalls and sunday schools flags
+polltest<-polltest%>%
+  # Group rows by polling location
+  group_by(address, precinct_id)%>%
+  # Sum flags for categories
+  mutate(public_justice = sum(across(c(public,justice))),
+         religious_school = sum(across(c(religious,school))))%>%
+  ungroup()
+## Add to category variable
+polltest$location_category[polltest$public_justice>1]<-'public_justice'
+polltest$location_category[polltest$religious_school>1]<-'religious_school'
+
+#remove individual categories and location count
+polltest<-subset(polltest, select=-c(religious,school,public,
+                                     justice,other,allegh_pub,library,
+                                     public_justice, religious_school))
+#remove duplicates 
+polltest<-unique(polltest)
+##(still have extra rows for some reason)
+
+#calc missingness by checking which addresses are in structure list
+#1-(sum(poll$address%in%structures$address)/9235) #60.9% missing
+####### save to csv
+#set directory
+setwd('C:/Users/natha/Desktop/Polling Places/data')
+write.csv(polltest, 'polllocation_and_structure16.csv')
+
+
+
+
+
+
+
+
+
+
