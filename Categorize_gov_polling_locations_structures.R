@@ -252,45 +252,55 @@ structures<-structures[complete.cases(structures),]
 poll_dfs<-list('2018'=poll_loc2018, '2019'=poll_loc2019,
                '2020'=poll_loc2020, '2021'=poll_loc2021, 
                '2022'=poll_loc2022, '2023'=poll_loc2023)
+# join poll locations to structures matrix
 for(i in seq_along(poll_dfs)){
-  assign(paste0('test',names(poll_dfs)[i]),
-         left_join(poll_dfs[[i]], structures, 'address', relationship='many-to-many'))
+  #Join
+  temp<-left_join(poll_dfs[[i]], structures, 'address', relationship='many-to-many')
+  #remove duplicates
+  temp<-unique(temp)
+  #Rename dataframe
+  assign(paste0('poll_struct',names(poll_dfs)[i]),temp)
+}
+### put dataframes into a list again
+poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019,
+               '2020'=poll_struct2020, '2021'=poll_struct2021, 
+               '2022'=poll_struct2022, '2023'=poll_struct2023)
+
+## save a copy of structure categorization matrix
+#write.csv(polltest, 'structure_matrix.csv')
+#location category count instead of location category to see what's multiple coded
+for(i in seq_along(poll_struct_dfs)){
+  temp<-poll_struct_dfs[[i]]%>%
+    group_by(address, PrecinctCode)%>%
+    mutate(location_count = sum(across(c(religious,school,public,
+                                         justice,other,allegh_pub,library))))%>%
+    ungroup()
+  ###### Create categories for multicategory locations
+  ### change locations with multiple categories to 'multiple' as a default
+  temp$location_category[temp$location_count>1]<-'multiple'
+  ###  Create police stations/townhalls and sunday schools flags
+  temp<-temp%>%
+    # Group rows by polling location
+    group_by(address, PrecinctCode)%>%
+    # Sum flags for categories
+    mutate(public_justice = sum(across(c(public,justice))),
+           religious_school = sum(across(c(religious,school))))%>%
+    ungroup()
+  ## Add to category variable
+  temp$location_category[temp$public_justice>1]<-'public_justice'
+  temp$location_category[temp$religious_school>1]<-'religious_school'
+  
+  #remove individual categories and location count
+  temp<-subset(temp, select=-c(religious,school,public,
+                                       justice,other,allegh_pub,library,
+                                       public_justice, religious_school))
+  #remove duplicates 
+  temp<-unique(temp)
+  ##(still have extra rows for some reason)
+  #Rename dataframe
+  assign(paste0('poll_struct',names(poll_struct_dfs)[i]),temp)
 }
 
-polltest<-left_join(poll, structures, 'address', relationship='many-to-many')
-#remove duplicates
-polltest<-unique(polltest)
-## save a copy of structure categorization matrix
-write.csv(polltest, 'structure_matrix.csv')
-#location category count instead of location category to see what's multiple coded
-polltest<-polltest%>%
-  group_by(address, precinct_id)%>%
-  mutate(location_count = sum(across(c(religious,school,public,
-                                       justice,other,allegh_pub,library))))%>%
-  ungroup()
-
-###### Create categories for multicategory locations
-### change locations with multiple categories to 'multiple' as a default
-polltest$location_category[polltest$location_count>1]<-'multiple'
-###  Create police stations/townhalls and sunday schools flags
-polltest<-polltest%>%
-  # Group rows by polling location
-  group_by(address, precinct_id)%>%
-  # Sum flags for categories
-  mutate(public_justice = sum(across(c(public,justice))),
-         religious_school = sum(across(c(religious,school))))%>%
-  ungroup()
-## Add to category variable
-polltest$location_category[polltest$public_justice>1]<-'public_justice'
-polltest$location_category[polltest$religious_school>1]<-'religious_school'
-
-#remove individual categories and location count
-polltest<-subset(polltest, select=-c(religious,school,public,
-                                     justice,other,allegh_pub,library,
-                                     public_justice, religious_school))
-#remove duplicates 
-polltest<-unique(polltest)
-##(still have extra rows for some reason)
 
 #calc missingness by checking which addresses are in structure list
 #1-(sum(poll$address%in%structures$address)/9235) #60.9% missing
