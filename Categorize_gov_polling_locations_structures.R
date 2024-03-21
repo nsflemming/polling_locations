@@ -205,12 +205,12 @@ libraries<-get_process_struct_data(struct_dir, 'Libraries_HIFLD_19_4_23.csv',
                                         structure_name = 'library')
 
 ################# county specific structure data
-allegheny<-read.csv('AlleghenyCounty_publicbldgs2023.csv')
+#allegheny<-read.csv('AlleghenyCounty_publicbldgs2023.csv')
 ### construct and trim to addresses and indicator
-allegheny$STATE<-'PA'
-allegheny<-process_struct_data(allegheny, 'address', 'city', 'STATE', 'zipcode', 'allegh_pub')
+#allegheny$STATE<-'PA'
+#allegheny<-process_struct_data(allegheny, 'address', 'city', 'STATE', 'zipcode', 'allegh_pub')
 ### abbreviate street names
-allegheny$address<-str_replace_all(allegheny$address, rep_str)
+#allegheny$address<-str_replace_all(allegheny$address, rep_str)
 
 ################ national map data
 nat_map<-read.csv('nat_map_PA.csv')
@@ -234,14 +234,14 @@ nat_map2<-subset(nat_map2, select = -c(ftype,fcode))
 ## one building can be multiple categories
 ### mark whether building is a category
 ### since issue with duplication one building is on multiple lists
-structures<-rbind(worship, education, firestations, policestations, allegheny, 
+structures<-rbind(worship, education, firestations, policestations, 
                   nat_map2, libraries)
 structures<-structures%>%
   mutate(religious=as.numeric(str_detect(location_category, 'religious')),
          school=as.numeric(str_detect(location_category, 'school')),
          public=as.numeric(str_detect(location_category, 'public')),
          justice=as.numeric(str_detect(location_category, 'justice')),
-         allegh_pub=as.numeric(str_detect(location_category, 'allegh_pub')),
+         #allegh_pub=as.numeric(str_detect(location_category, 'allegh_pub')),
          other=as.numeric(str_detect(location_category, 'other')),
          library=as.numeric(str_detect(location_category, 'library')))
 #remove uncategorized structures
@@ -272,8 +272,9 @@ poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019,
 for(i in seq_along(poll_struct_dfs)){
   temp<-poll_struct_dfs[[i]]%>%
     group_by(address, PrecinctCode)%>%
-    mutate(location_count = sum(across(c(religious,school,public,
-                                         justice,other,allegh_pub,library))))%>%
+    mutate(location_count = sum(across(c(religious,school,public,justice,other,
+                                         #allegh_pub,
+                                         library))))%>%
     ungroup()
   ###### Create categories for multicategory locations
   ### change locations with multiple categories to 'multiple' as a default
@@ -291,23 +292,23 @@ for(i in seq_along(poll_struct_dfs)){
   temp$location_category[temp$religious_school>1]<-'religious_school'
   
   #remove individual categories and location count
-  temp<-subset(temp, select=-c(religious,school,public,
-                                       justice,other,allegh_pub,library,
-                                       public_justice, religious_school))
+  temp<-subset(temp, select=-c(religious,school,public,justice,other,
+                               #allegh_pub,
+                               library, public_justice, religious_school))
   #remove duplicates 
   temp<-unique(temp)
-  ##(still have extra rows for some reason)
+  ##(still have extra rows?)
+  ####### save to csv
+  #set directory
+  setwd('C:/Users/natha/Desktop/Polling Places/data')
+  write.csv(temp, paste0('poll_struct_gov',names(poll_struct_dfs)[i],'.csv'))
   #Rename dataframe
-  assign(paste0('poll_struct',names(poll_struct_dfs)[i]),temp)
+  assign(paste0('poll_struct_gov',names(poll_struct_dfs)[i]),temp)
 }
-
 
 #calc missingness by checking which addresses are in structure list
 #1-(sum(poll$address%in%structures$address)/9235) #60.9% missing
-####### save to csv
-#set directory
-setwd('C:/Users/natha/Desktop/Polling Places/data')
-write.csv(polltest, 'polllocation_and_structure16.csv')
+
 
 
 
