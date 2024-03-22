@@ -1,5 +1,5 @@
 #Nathaniel Flemming
-# 29/2/24
+# 19/3/24
 
 library(tidyverse)
 library(data.table) #read in data selectively
@@ -22,6 +22,15 @@ get_poll <- function(dir, filename, num, direction, street, street_type, city){
   data <- read.csv(filename)
   data<-make_address(data, num, direction, street, street_type, city)
   return(data)
+}
+
+# Read in location category data
+get_cat_data <- function(dir, filename, vars){
+  setwd(dir)
+  cat<-read.csv(filename)
+  ## remove unneeded columns
+  cat <- subset(cat, select = vars)
+  return(cat)
 }
 
 ### How many addresses kept/dropped year to year
@@ -168,11 +177,16 @@ comp_addrs_county<-function(data1, data2, addr_var){
 
 ## compare dataframes of years in a list
 comp_addrs_list<-function(df_list){
+  #dataframe to store output in 
   output<-data.frame()
+  # for dataframe with a succeeding dataframe
   for(i in 1:(length(df_list)-1)){
+    # dataframe and succeeding dataframe
     df1<-df_list[[i]]
     df2<-df_list[[i+1]]
+    # 'concatenate' outputs of comp_addrs together
     output<-rbind(output,comp_addrs(df1, df2, 'Address'))
+    # Label the years
     output[['years']][i]<-paste(toString(names(df_list)[i]),
                                 toString(names(df_list)[i+1]),sep = '_')
   }
@@ -192,6 +206,40 @@ comp_addrs_list_cnty<-function(df_list){
   return(output)
 }
 
+### Compare polling location category across years
+comp_cat<-function(df1, df2, merge_v1, merge_v2, cat_v1, cat_v2){
+  temp<-left_join(df1, df2, by=c(merge_v1, merge_v2))
+  temp<-temp%>%
+    select(merge_v1, merge_v2, cat_v1, cat_v2)
+  # Check if x matches y
+  temp$LocCategoryChanged<-(temp[cat_v1]!=temp[cat_v2] | 
+                              (is.na(temp[cat_v1]) & !is.na(temp[cat_v2]) | 
+                              !is.na(temp[cat_v1]) & is.na(temp[cat_v2])))
+  return(temp)
+}
+
+## Calculate change in number of locations per category
+net_cat_chng<-function(df, cat_v1='location_category.y', 
+                       cat_v2='location_category.x', cat){
+  # subtract succeeding year sum from previous year sum
+  output<-sum(df[cat_v1]==cat, na.rm=T)-
+    sum(df[cat_v2]==cat, na.rm=T)
+  return(output)
+}
+
+## Calculate change in number of locations by category 
+#### group_by variable hardcoded because of dplyr
+sum_cat_chng<-function(df, cat_v='location_category.x'){
+  output<-df %>%
+    #group by location type
+    group_by(location_category.x) %>%
+    # sum number of category changes
+    mutate(num_changes = sum(LocCategoryChanged)) %>%
+    select(c(location_category.x, num_changes))%>%
+    distinct()
+  return(output)
+}
+
 ### Save plot
 save_plot<-function(plot_dir, filename, plotname, width=2000, height=1000){
   setwd(plot_dir)
@@ -201,32 +249,35 @@ save_plot<-function(plot_dir, filename, plotname, width=2000, height=1000){
 
 ##################################################
 #set directories
+cat_dir <- 'C:/Users/natha/Desktop/Polling Places/data'
 poll_dir <- 'C:/Users/natha/Desktop/Polling Places/data/gov_poll_places'
 plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
-# get data and process
-filenames<-c('Polling Place List 20180514.csv','Polling Place List 20190513.csv',
-             'Polling Place List 20201102.csv','Polling Place List 20211101.csv',
-             'Polling Place List 20220506.csv','Polling Place List 20231106.csv')
+# get poll location data and process
+filenames<-c('poll_struct_key_gov18.csv', 'poll_struct_key_gov19.csv',
+             'poll_struct_key_gov20.csv', 'poll_struct_key_gov21.csv',
+             'poll_struct_key_gov22.csv', 'poll_struct_key_gov23.csv')
 for(file in filenames){
-  assign(paste0('poll_loc',substr(file,20,23)),
-         get_poll(poll_dir, file, num='HouseNum', direction='PrefixDirection',
+  assign(paste0('poll_loc',substr(file,20,21)),
+         get_poll(cat_dir, file, num='HouseNum', direction='PrefixDirection',
                   street='Street', street_type = 'StreetType',city='City'))
 }
-# compare addresses in one year to addresses in another year
+
 ### put dataframes into a list
-poll_dfs<-list('2018'=poll_loc2018, '2019'=poll_loc2019,
-               '2020'=poll_loc2020, '2021'=poll_loc2021, 
-               '2022'=poll_loc2022, '2023'=poll_loc2023)
+poll_dfs<-list('2018'=poll_loc18, '2019'=poll_loc19,
+               '2020'=poll_loc20, '2021'=poll_loc21, 
+               '2022'=poll_loc22, '2023'=poll_loc23)
+## create separate lists before and after redistricting
+poll_dfs_1819<-list('2018'=poll_loc18, '2019'=poll_loc19)
+poll_dfs_2023<-list('2020'=poll_loc20, '2021'=poll_loc21, 
+                    '2022'=poll_loc22, '2023'=poll_loc23)
+
+# compare addresses in one year to addresses in another year
 ## loop through list
 overallchng_yrtoyr<-comp_addrs_list(poll_dfs)
 ## compare years by county
 countychng_yrtoyr<-comp_addrs_list_cnty(poll_dfs)
 
 ####match precincts year to year and see which changed their polling location
-## create separate lists before and after redistricting
-poll_dfs_1819<-list('2018'=poll_loc2018, '2019'=poll_loc2019)
-poll_dfs_2023<-list('2020'=poll_loc2020, '2021'=poll_loc2021, 
-                    '2022'=poll_loc2022, '2023'=poll_loc2023)
 locchng_yty_cnty<-prec_chng_list(poll_dfs_1819)
 locchng_yty_cnty<-rbind(locchng_yty_cnty, prec_chng_list(poll_dfs_2023))
 
@@ -312,6 +363,116 @@ cnty_loc_pctchng_plot<-locchng_yty_cnty_sum %>%
   scale_y_continuous(labels = scales::percent)
 cnty_loc_pctchng_plot
 save_plot(plot_dir, 'Changes_in_location_by_county_percentage.png', cnty_loc_pctchng_plot,
+          width=4000, height=2000)
+
+
+################## Number of location changes where the type of location changes
+## flag changes in each year pair
+for(i in 1:(length(poll_dfs)-1)){
+  assign(paste0('poll_loccat_chng',paste(toString(names(poll_dfs)[i]),
+                                         toString(names(poll_dfs)[i+1]),sep = '_')),
+         comp_cat(poll_dfs[[i]], poll_dfs[[i+1]], 'PrecinctName', 'PrecinctCode',
+                  'location_category.x', 'location_category.y'))
+}
+# put dataframes into a list
+cat_chng_dfs<-list('2018_2019'=poll_loccat_chng2018_2019, '2019_2020'=poll_loccat_chng2019_2020,
+               '2020_2021'=poll_loccat_chng2020_2021, '2021_2022'=poll_loccat_chng2021_2022, 
+               '2022_2023'=poll_loccat_chng2022_2023)
+
+###### Total number of type changes
+##### move this into a function
+ttl_type_chng<-data.frame()
+for(i in 1:length(cat_chng_dfs)){
+  ttl_type_chng<-rbind(ttl_type_chng, toString(names(cat_chng_dfs)[i]))
+  ttl_type_chng$total_change[i]<-sum(cat_chng_dfs[[i]][5]==T, na.rm=T)
+}
+ttl_type_chng$total_change<-as.numeric(ttl_type_chng$total_change)
+ttl_type_chng<-ttl_type_chng%>%rename(years=X.2018_2019.)
+### Plot
+ttl_type_chng_plot<-ttl_type_chng %>%
+  ggplot(aes(x=years, y=total_change))+
+  geom_col(fill='deepskyblue3') +
+  labs(title = 'Changes in Polling Locations\' Categories Year to Year', x='Year Pairs', 
+       y='Number of Locations')+
+  theme_minimal()
+ttl_type_chng_plot
+save_plot(plot_dir, 'Changes_in_type_by_year.png', ttl_type_chng_plot,
+          width=4000, height=2000)
+
+##### Number of changes by category
+ttl_chngs_by_cat_year<-data.frame()
+for (i in 1:length(cat_chng_dfs)){
+  temp<-sum_cat_chng(cat_chng_dfs[[i]])
+  temp$years<-(toString(names(cat_chng_dfs)[i]))
+  ttl_chngs_by_cat_year<-rbind(ttl_chngs_by_cat_year, temp)
+}
+## Plot
+ttl_chngs_by_cat_year_plot<-ttl_chngs_by_cat_year %>%
+  ggplot(aes(fill=location_category.x, x=location_category.x, y=num_changes))+
+  geom_bar(position='dodge',stat='identity') +
+  labs(title = 'Changes in Polling Locations\' Categories Year to Year', x='County', 
+       y='Number of Locations Changed')+
+  facet_grid(rows = vars(years))+
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_fill_discrete(name='Category')
+ttl_chngs_by_cat_year_plot
+save_plot(plot_dir, 'Changes_in_type_by_cat_and_year.png', ttl_chngs_by_cat_year_plot,
+          width=4000, height=2000)
+
+##### Net change by category
+# list of location categories
+cat_list<-c('public_justice','public','multiple','school','religious','library',
+            'justice','religious_school', 'other')
+# loop through dataframes and categories
+net_chng_by_cat_year<-data.frame()
+for(i in 1:(length(cat_chng_dfs))){
+  for(j in (1:length(cat_list))){
+    # 'concatenate' outputs of sum category changes together
+    net_chng_by_cat_year<-rbind(net_chng_by_cat_year, 
+                            net_cat_chng(cat_chng_dfs[[i]],'location_category.y',
+                                        'location_category.x',cat_list[j]))
+    # Label the years
+    net_chng_by_cat_year[['years']][((i-1)*length(cat_list))+j]<-paste(toString(names(cat_chng_dfs)[i]))
+  }
+}
+# Label the sum column
+net_chng_by_cat_year<-net_chng_by_cat_year%>%
+  rename(net_change=X21L)
+# Label the categories
+net_chng_by_cat_year['category']<-rep(cat_list, length(cat_chng_dfs))
+## Plot change in number of locations of each category
+net_chng_by_cat_year_plot<-net_chng_by_cat_year %>%
+  ggplot(aes(fill=category, x=category, y=net_change))+
+  geom_bar(position='dodge',stat='identity') +
+  labs(title = 'Changes in Polling Locations\' Types', x='Year Pair', 
+       y='Number of Locations Changed')+
+  facet_grid(rows = vars(years))+
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_fill_discrete(name='Category')+
+  geom_abline()
+net_chng_by_cat_year_plot
+save_plot(plot_dir, 'Net_changes_in_location_type.png', net_chng_by_cat_year_plot,
+          width=4000, height=2000)
+
+#### Percentage of location changes that change the type of location too
+total_change<-overallchng_yrtoyr%>%select(years, total_change)
+ttl_chngs_by_cat_year<-left_join(ttl_chngs_by_cat_year, total_change, by='years')
+ttl_chngs_by_cat_year$perc_of_changes<-ttl_chngs_by_cat_year$num_changes/ttl_chngs_by_cat_year$total_change
+## plot
+perc_chngs_by_cat_year_plot<-ttl_chngs_by_cat_year %>%
+  ggplot(aes(fill=location_category.x, x=location_category.x, y=perc_of_changes))+
+  geom_bar(position='dodge',stat='identity') +
+  labs(title = 'Changes in Polling Locations\' Types', x='Year Pair', 
+       y='Percentage of Locations Changed that also Changed Category')+
+  facet_grid(rows = vars(years))+
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle = 90, vjust = 0.5, hjust=1))+
+  scale_fill_discrete(name='Category')+
+  geom_abline()
+perc_chngs_by_cat_year_plot
+save_plot(plot_dir, 'Percent_changes_in_location_type.png', perc_chngs_by_cat_year_plot,
           width=4000, height=2000)
 
 
