@@ -4,6 +4,8 @@
 library(tidyverse)
 library(data.table) #read in L2 data selectively
 library(stringr) #string manipulation
+library(fuzzyjoin) #fuzzy match precinct names
+library(stringdist) #fuzzy match precinct names
 
 ########## Functions
 
@@ -31,7 +33,31 @@ get_poll_data <- function(poll_dir, filename, vars){
   ## remove unneeded columns
   poll <- subset(poll, select = vars)
   return(poll)
+}
+
+### fuzzy match precinct names within counties
+fuzzy_match_precincts<-function(df1, df2, prec_var='Precinct',prec_var2='PrecinctName',
+                                county_var='County'){
+  # get list of counties
+  counties<-unique(df1[[county_var]])
+  # create crosswalk data frame
+  crosswalk<-data.frame()
+  for(county in counties){
+    # get list of precincts w/in county
+    list1<-unique(df1[[prec_var]][df1[[county_var]]==county])
+    list2<-unique(df2[[prec_var2]][df2[[county_var]]==county])
+    ## calculate string distance b/t each precinct
+    result<-stringdistmatrix(list1, list2, method='jw')
+    ## get index of col with lowest value for each row
+    closest_match<-apply(result, 1, which.min)
+    # create crosswalk for the county
+    temp<-as.data.frame(cbind('County'=county,'Precinct'=list1,list2[closest_match]))
+    print(county)
+    # bind into larger crosswalk
+    crosswalk<-rbind(crosswalk, temp)
   }
+  return(crosswalk)
+}
 
 ## convert dollars to numeric
 dollar_to_num <- function(data, inc_var){
@@ -98,48 +124,38 @@ L2demog<-left_join(L2demog, race17, by='LALVOTERID')
 L2demog<-left_join(L2demog, race18, by='LALVOTERID')
 ### drop voterhistory
 rm(L2votehist)
+### drop race imputations
+rm(race16, race17, race18)
 
-################# merge L2 data with matched precincts
-### Read manually matched L2 and poll location precinct names back in
-match<-get_match_data(data_dir, 'joined_sheet_matched.csv', 
-                    c('county_pre', 'county_name', 'precinct_name', 'precinct_id'))
-
-### Edit precinct names to match poll location file
-match$county_pre <- str_remove(match$county_pre, pattern = '#')
-### Merge precinct and county names in L2 data frame
-L2demog$county_pre = paste0(L2demog$County,' - ',L2demog$Precinct)
-### Combine L2 and poll location county precinct sheets
-county_pre<-as.data.frame(unique(L2demog$county_pre))
-county_pre$index<-row.names(county_pre)
-match$index<-row.names(match)
-match<-left_join(match, county_pre, by='index')
-write.csv(match, 'L2_poll_precincts_mismatch.csv')
-######## Align county_precinct names manually
-## read back in
-match_aligned<-read.csv('L2_poll_precincts_aligned.csv')
-#rename columns
-match_aligned<-match_aligned%>%
-  rename(L2_county_pre = unique.L2demog.county_pre.)
-L2demog<-rename(L2demog, L2_county_pre = county_pre)
-
-## merge L2 with joined_sheet on L2 precinct names
-L2demog<-left_join(L2demog, match_aligned, by='L2_county_pre')
-## Drop crosswalk
-rm(match)
-rm(match_aligned)
-7677867-sum(is.na(L2demog$precinct_id))
-
-################# merge in polling place categories
+################# merge L2 data with polling location data
 # Read in location/category data
-poll <- get_poll_data(data_dir, 'polllocation_structure_and_keyword.csv', 
-              c('county_name', 'precinct_name', 'location_category'))
-# Join in poll location data
-L2demog <- left_join(L2demog, poll, by=c('county_name', 'precinct_name'))
+poll <- get_poll_data(data_dir, 'poll_struct_key_govsource18.csv', 
+                      c('CountyName', 'PrecinctName', 'location_category'))
+## rename variables to match L2
+poll<-poll%>%
+  rename('County'='CountyName')
+### Replace '-' in L2 precinct names to better match government format
+L2demog<-L2demog%>%
+  mutate(across('Precinct', str_replace, '-', ' '))#deprecated syntax?
+### Convert government county names to all caps to match L2
+poll$County<-toupper(poll$County)
+
+## Create a crosswalk by fuzzy matching precinct names
+crosswalk<-fuzzy_match_precincts(L2demog, poll)
+####### Double check inexact matches
+# rename columns to match other data sets
+crosswalk<-crosswalk%>%
+  rename('PrecinctName'='V3')
+## Join the crosswalk into L2 
+L2demog<-left_join(L2demog, crosswalk, by=c('County','Precinct'))
+
+#### join the poll location categories in
+L2demog<-left_join(L2demog, poll, by=c('County','PrecinctName'))
 ## drop location 
 rm(poll)
-7677867-sum(is.na(L2demog$precinct_id))
+#7677867-sum(is.na(L2demog$precinct_id))
 ##### Drop extraneous variables
-L2demog <- subset(L2demog, select = -c(X, index))
+#L2demog <- subset(L2demog, select = -c(X, index))
 
 ####################### Process L2 data to more usable forms
 # Convert income to numeric
@@ -160,6 +176,14 @@ L2demog<-educ_to_ord(L2demog, 'CommercialData_Education', educ_map)
 L2demog$location_category <- as.factor(L2demog$location_category)
 # Convert parties to factor
 L2demog$Parties_Description <- as.factor(L2demog$Parties_Description)
+# Replace blanks with 'no' for union membership
+L2demog$CommercialData_LikelyUnion[L2demog$CommercialData_LikelyUnion==''] <- 'No'
+## factor
+L2demog$CommercialData_LikelyUnion<-as.factor(L2demog$CommercialData_LikelyUnion)
+# Replace blank with 'unknown' for occupation industry
+L2demog$CommercialData_OccupationIndustry[L2demog$CommercialData_OccupationIndustry==''] <- 'Unknown'
+## factor
+L2demog$CommercialData_OccupationIndustry<-as.factor(L2demog$CommercialData_OccupationIndustry)
 
 ## Create Binary Variables
 # Convert household composition to child yes/no
@@ -169,10 +193,15 @@ L2demog$known_religious <- L2demog$Religions_Description!=""
 # Convert gender to M/F, set blank to missing
 L2demog$Voters_Gender <- ifelse(L2demog$Voters_Gender=="",NA,L2demog$Voters_Gender)
 ## Create Location dummy variables
-L2demog$school <- L2demog$location_category=='school' 
+L2demog$pub_loc<-L2demog$location_category=='public'
+L2demog$pub_just <- L2demog$location_category=='public_justice'
+L2demog$other<-L2demog$location_category=='other'
 L2demog$relig_loc <- (L2demog$location_category=='religious'|L2demog$location_category=='religious_school')
+L2demog$school <- L2demog$location_category=='school' 
+L2demog$multiple <- L2demog$location_category=='multiple'
 L2demog$justice_loc <- (L2demog$location_category=='justice'|L2demog$location_category=='public_justice')
-L2demog$pub_loc <- L2demog$location_category=='public' 
+L2demog$library<-L2demog$location_category=='library'
+L2demog$relig_school <- L2demog$location_category=='religious_school' 
 ### Create black dummy variable
 ## most probable race category
 L2demog_sub<-L2demog[,c('pred.whi_2018', 'pred.bla_2018', 'pred.his_2018',
@@ -190,6 +219,6 @@ L2demog$known_repub <- ifelse(L2demog$Parties_Description=="Republican",TRUE,FAL
 setwd(data_dir)
 write.csv(L2demog, 'L2PA_full.csv')
 
-mini_data <- L2demog[sample(nrow(L2demog), 100000),]
+#mini_data <- L2demog[sample(nrow(L2demog), 100000),]
 
 
