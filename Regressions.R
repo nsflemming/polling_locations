@@ -18,10 +18,10 @@ binarize_vote <- function(data, vote_var, yes_vote_value){
   return(data)
 }
 
-
 ## Logistic regression
 log_reg <- function(data, dep_var, ind_vars){
   ind_vars_coll <- paste(ind_vars, collapse = '+')
+  print(ind_vars_coll)
   formula = paste0(dep_var,'~',ind_vars_coll)
   m_base <- glm(data=data, 
                 formula,
@@ -37,6 +37,23 @@ write_summ <- function(results_dir, model_name, model){
   sink()
 }
 
+## Logistic regressions for a list of interactions
+log_reg_inter<-function(df,dep_var='General_2018_11_06', interaction_terms, 
+                        ind_vars=c('Voters_Gender', 'Voters_Age',
+                                   'CommercialData_Education','Residence_Families_HHCount',
+                                   'known_religious','CommercialData_LikelyUnion', 
+                                   'CommercialData_OccupationIndustry',
+                                   'MilitaryStatus_Description')){
+  for(interaction in interaction_terms){
+    print(interaction)
+    ind_vars_list<-c(interaction,ind_vars)
+    # model
+    model<-log_reg(model_data, dep_var, ind_vars_list)
+    summary(model)
+    #save results
+    write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),'_summary'), model)
+  }
+}
 # Make and plot predictions
 boxplot_preds <- function(model, plotdata, var1, var2, num_ran_vars, xlab, ylab, color_lab, 
                           dir, plot_name){
@@ -93,7 +110,6 @@ grid_boxplot <- function(model, data, var1, var2, num_ran_vars, xlab, ylab, colo
 
 
 
-
 ########################################################### Main
 # set directories
 data_dir <- "C:/Users/natha/Desktop/Polling Places/data"
@@ -134,20 +150,24 @@ model_data<-droplevels(model_data)
 ## subset data for initial testing
 mini_data <- model_data[sample(nrow(model_data), 100000),]
 
+## create vector of location categories
+categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
+              'justice_loc','library','relig_school ')
+
 #################### Logistic Regression
-#### Probability of turning out, location category as predictor
-## Sets of variables
-ind_vars_base <-c(
+## Common set of covariates
+common_covars <-c(
   # Demographics
   'Voters_Gender', 'Voters_Age', 'Parties_Description',
-  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
-  # Race
-  'pred_race',
-  # Polling place type
-  'location_category'
+  'CommercialData_Education','Residence_Families_HHCount',
+  'known_religious','CommercialData_LikelyUnion', 
+  'CommercialData_OccupationIndustry'
 )
-# Base model
-m_base<-log_reg(model_data, 'General_2018_11_06', ind_vars_base)
+
+#### Probability of turning out, location category as predictor
+ind_vars_loc<-c('location_category',common_covars)
+# locations model
+m_base<-log_reg(model_data, 'General_2018_11_06', ind_vars_loc)
 summary(m_base)
 #save results
 write_summ(results_dir, 'base', m_base)
@@ -159,20 +179,15 @@ plotdata<-with(model_data, data.frame(location_category=c('justice','library',
                                       Voters_Gender='M',
                                       Voters_Age=mean(Voters_Age, na.rm=T),
                                       Parties_Description='Republican',
-                                      CommercialData_Education=mean(CommercialData_Education, na.rm=T),
-                                      CommercialData_EstimatedHHIncomeAmount = mean(CommercialData_EstimatedHHIncomeAmount, na.rm=T),
-                                      pred_race='pred.whi_2018'))
+                                      CommercialData_Education=mean(CommercialData_Education, na.rm=T)
+                                      ))
 
 ### Probability of turning out, if has/lacks child and is voting at a school
 #vars
 ind_vars_child_schl <-c(
   # var of interest
   'has_child*school',
-  # Demographics
-  'Voters_Gender', 'Voters_Age', 'Parties_Description',
-  # Race
-  #'pred_race',
-  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount'
+  common_covars
 )
 # model
 m_schl<-log_reg(model_data, 'General_2018_11_06', ind_vars_child_schl)
@@ -216,12 +231,7 @@ grid_boxplot(m_schl, new_data, 'has_child', 'school', 2, xlab='Has a child/child
 ind_vars_gov_emp <-c(
   # var of interest
   'known_gov_emp*pub_loc',
-  # Demographics
-  'Voters_Gender', 'Voters_Age', 'Parties_Description',
-  # Race
-  #'pred_race',
-  #
-  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount'
+  common_covars
 )
 # model
 m_gov<-log_reg(model_data, 'General_2018_11_06', ind_vars_gov_emp)
@@ -247,22 +257,15 @@ grid_boxplot(m_gov, new_data, 'known_gov_emp', 'pub_loc', 2, xlab='Is a Governme
              ylab = 'Probability of Turningout',color_lab = 'Votes at a Public Building',
              plot_dir=plot_dir, plot_name='gov_pub_pred_plot.png')
 
-### Probability of turning out, if known_republican and is voting at religious building
-#vars
-ind_vars_repub <-c(
-  # var of interest
-  'known_repub*relig_loc',
-  # Demographics
-  'Voters_Gender', 'Voters_Age',
-  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
-  # Race
-  'pred_race'
-)
-# model
-m_repub<-log_reg(model_data, 'General_2018_11_06', ind_vars_repub)
-summary(m_repub)
-#save results
-write_summ(results_dir, 'repub_relig', m_repub)
+
+######### Probability of turning out, if known_republican at each building type
+## create interaction terms
+interactions<-paste('known_repub*',categories, sep='')
+## remove parties variable
+repub_covars<-common_covars[-3]
+## run models
+log_reg_inter(model_data, interaction_terms=interactions, ind_vars = repub_covars)
+
 ## Calculate and plot predicted probabilities
 # Create dataframe for prediction
 new_data <- expand.grid(known_repub = c(TRUE,FALSE),
@@ -272,7 +275,6 @@ new_data <- expand.grid(known_repub = c(TRUE,FALSE),
                         #pred_race=levels(as.factor(model_data$pred_race)),
                         Voters_Age=mean(model_data$Voters_Age, na.rm=T), 
                         CommercialData_Education=mean(model_data$CommercialData_Education, na.rm=T),
-                        CommercialData_EstimatedHHIncomeAmount = mean(model_data$CommercialData_EstimatedHHIncomeAmount, na.rm=T)
 )
 preds<-predict(m_repub, newdata=new_data, type='response', se.fit=T)
 pred_probs<-preds$fit
@@ -282,22 +284,10 @@ grid_boxplot(m_repub, new_data, 'known_repub', 'relig_loc', 2, xlab='Is a Republ
              ylab = 'Probability of Turningout',color_lab = 'Votes at a Religious Building',
              plot_dir=plot_dir, plot_name='repub_relig_pred_plot.png')
 
-### Probability of turning out, if known_republican and is voting at a public building
-#vars
-ind_vars_repub2 <-c(
-  # var of interest
-  'known_repub*pub_loc',
-  # Demographics
-  'Voters_Gender', 'Voters_Age',
-  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
-  # Race
-  'pred_race'
-)
-# model
-m_repub2<-log_reg(model_data, 'General_2018_11_06', ind_vars_repub2)
-summary(m_repub2)
-#save results
-write_summ(results_dir, 'repub_pub', m_repub2)
+
+
+
+### Probability of turning out, if known_republican at different buildings
 
 ### Probability of turning out, if known_religious and is voting at religious building
 #vars
