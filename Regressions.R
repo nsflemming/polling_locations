@@ -72,7 +72,8 @@ log_reg_inter<-function(df,dep_var='General_2018_11_06', interaction_terms,
     model<-log_reg(df, dep_var, ind_vars_list)
     summary(model)
     #save results
-    write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),'_summary'), model)
+    first_term<-str_extract(interaction, ".*(?=\\*)")
+    write_summ(results_dir, paste0(substr(interaction,1,nchar(first_term)),'x',substr(interaction,(nchar(first_term)+2),100),'_summary'), model)
   }
 }
 
@@ -90,18 +91,25 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
     model<-log_reg(df, dep_var, ind_vars_list)
     summary(model)
     # calculate predicted probabilities
-    model_pred<-predict_response(model, terms=c(substr(interaction,1,11), substr(interaction,13,100)), 
+    ## get first variable in interaction term
+    first_term<-str_extract(interaction, ".*(?=\\*)")
+    ## predict
+    model_pred<-predict_response(model, terms=c(substr(interaction,1,nchar(first_term)), 
+                                                substr(interaction,(nchar(first_term)+2),100)), 
                                  margin='marginalmeans')
     #save results
-    write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),
+    write_summ(results_dir, paste0(substr(interaction,1,nchar(first_term)),'x',
+                                   substr(interaction,(nchar(first_term)+2),100),
                                    substr(dep_var,9,12),'_summary'), model)
     # Generate plot details
-    plot_title=paste0('Probability of Turning Out for', substr(interaction,1,11),'x',
-                      substr(interaction,13,100))
-    xlab = 'Known Republican'
-    legend_title = substr(interaction,13,100)
+    plot_title=paste0('Probability of Turning Out for', substr(interaction,1,nchar(first_term)),
+                      'x',
+                      substr(interaction,(nchar(first_term)+2),100))
+    xlab = 'Known Republican' #make dynamic
+    legend_title = substr(interaction,(nchar(first_term)+2),100)
     output_dir = image_dir
-    image_name = paste0('Pred_Prob_',substr(interaction,1,11),'x',substr(interaction,13,100),
+    image_name = paste0('Pred_Prob_',substr(interaction,1,nchar(first_term)),'x',
+                        substr(interaction,(nchar(first_term)+2),100),
                         substr(dep_var,9,12))
     pred_prob_plot(model_pred, dodge=0.8, plot_title, xlab, ylab='Predicted Probability of Turning Out',
                    legend_title, angle=0, legend_position='right', output_dir, image_name)
@@ -119,13 +127,13 @@ log_reg_inter_plus_margins<-function(df,dep_var='General_2018_11_06', interactio
     print(interaction)
     ind_vars_list<-c(interaction,ind_vars)
     # model
-    model<-log_reg(model_data, dep_var, ind_vars_list)
+    model<-log_reg(df, dep_var, ind_vars_list)
     summary(model)
     # calculate Average Marginal Effect
     base_margins<-margins(model, variables = var_of_int)
     #save marginal effects
     setwd(save_dir)
-    sink(file=paste0("MarginsSummary_",paste0(substr(interaction,1,11),'x',substr(interaction,13,100)),".txt"))
+    sink(file=paste0("MarginsSummary_",paste0(substr(interaction,1,11),'x',substr(interaction,13,100)),".txt")) #make dynamic
     print(summary(base_margins))
     sink()
     #save results
@@ -349,7 +357,16 @@ log_reg_inter_plus_plot(model_data,dep_var='General_2017_11_07',
                         results_dir= results_dir, image_dir=plot_dir)
 
 
-### Probability of turning out, if known_religious and is voting at religious building
+### Probability of turning out, if known_religious at each building type
+## create interaction terms
+interactions<-paste('known_religious*',categories, sep='')
+## remove religion variable
+relig_covars<-common_covars[! common_covars %in% c('known_religious')]
+## run models and plot results
+log_reg_inter_plus_plot(model_data,dep_var='General_2018_11_06', 
+                        interaction_terms=interactions, ind_vars = relig_covars,
+                        results_dir= results_dir, image_dir=plot_dir)
+
 #vars
 ind_vars_relig <-c(
   # var of interest
