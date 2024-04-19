@@ -253,11 +253,11 @@ cat_dir <- 'C:/Users/natha/Desktop/Polling Places/data'
 poll_dir <- 'C:/Users/natha/Desktop/Polling Places/data/gov_poll_places'
 plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
 # get poll location data and process
-filenames<-c('poll_struct_key_gov18.csv', 'poll_struct_key_gov19.csv',
-             'poll_struct_key_gov20.csv', 'poll_struct_key_gov21.csv',
-             'poll_struct_key_gov22.csv', 'poll_struct_key_gov23.csv')
+filenames<-c('poll_struct_key_govsource18.csv', 'poll_struct_key_govsource19.csv',
+             'poll_struct_key_govsource20.csv', 'poll_struct_key_govsource21.csv',
+             'poll_struct_key_govsource22.csv', 'poll_struct_key_govsource23.csv')
 for(file in filenames){
-  assign(paste0('poll_loc',substr(file,20,21)),
+  assign(paste0('poll_loc',substr(file,26,27)),
          get_poll(cat_dir, file, num='HouseNum', direction='PrefixDirection',
                   street='Street', street_type = 'StreetType',city='City'))
 }
@@ -474,6 +474,10 @@ perc_chngs_by_cat_year_plot<-ttl_chngs_by_cat_year %>%
 perc_chngs_by_cat_year_plot
 save_plot(plot_dir, 'Percent_changes_in_location_type.png', perc_chngs_by_cat_year_plot,
           width=4000, height=2000)
+
+#### Number of location changes that don't change category, within each category
+
+
 
 
 
