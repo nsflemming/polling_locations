@@ -82,7 +82,7 @@ educ_to_ord <- function(data, educ_var, mapping){
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places\\data'
 L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places\\data\\VM2_PA_2019_08_23'
 # Set variable lists
-vote_vars<-c('LALVOTERID', 'General_2018_11_06')
+vote_vars<-c('LALVOTERID', 'General_2018_11_06','General_2017_11_07')
 demog_vars<-c('LALVOTERID', 
               #address/location
               'Residence_Addresses_AddressLine',
@@ -99,9 +99,9 @@ demog_vars<-c('LALVOTERID',
               'CommercialData_LikelyUnion', 'CommercialData_OccupationGroup',
               'CommercialData_OccupationIndustry',
               #Political
-              'Parties_Description',
+              'Parties_Description'
               #Misc
-              'MilitaryStatus_Description'
+              #'MilitaryStatus_Description'
               )
 
 # Read in data
