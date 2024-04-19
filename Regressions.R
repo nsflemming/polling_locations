@@ -93,14 +93,16 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
     model_pred<-predict_response(model, terms=c(substr(interaction,1,11), substr(interaction,13,100)), 
                                  margin='marginalmeans')
     #save results
-    write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),'_summary'), model)
+    write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),
+                                   substr(dep_var,9,12),'_summary'), model)
     # Generate plot details
     plot_title=paste0('Probability of Turning Out for', substr(interaction,1,11),'x',
                       substr(interaction,13,100))
     xlab = 'Known Republican'
     legend_title = substr(interaction,13,100)
     output_dir = image_dir
-    image_name = paste0('Pred_Prob_',substr(interaction,1,11),'x',substr(interaction,13,100))
+    image_name = paste0('Pred_Prob_',substr(interaction,1,11),'x',substr(interaction,13,100),
+                        substr(dep_var,9,12))
     pred_prob_plot(model_pred, dodge=0.8, plot_title, xlab, ylab='Predicted Probability of Turning Out',
                    legend_title, angle=0, legend_position='right', output_dir, image_name)
   }
@@ -111,8 +113,8 @@ log_reg_inter_plus_margins<-function(df,dep_var='General_2018_11_06', interactio
                         ind_vars=c('Voters_Gender', 'Voters_Age',
                                    'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
                                    'known_religious','CommercialData_LikelyUnion', 
-                                   'CommercialData_OccupationIndustry')
-                        , var_of_int, save_dir){
+                                   'CommercialData_OccupationIndustry'),
+                        var_of_int, save_dir){
   for(interaction in interaction_terms){
     print(interaction)
     ind_vars_list<-c(interaction,ind_vars)
@@ -226,6 +228,7 @@ model_data<-read.csv('L2PA_full.csv')
 
 # Convert vote to binary
 model_data <- binarize_vote(model_data, 'General_2018_11_06', 'Y')
+model_data <- binarize_vote(model_data, 'General_2017_11_07', 'Y')
 ### set reference categories
 #### factorize variables and relevel
 # Location category
@@ -280,10 +283,10 @@ ind_vars_loc<-c('location_category',common_covars)
 # locations model
 #m_base<-log_reg_plus_margins(model_data, 'General_2018_11_06', ind_vars_loc, 
 #                             'location_category', results_dir, 'base')
-m_base<-log_reg(model_data, 'General_2018_11_06', ind_vars_loc)
+m_base<-log_reg(model_data, 'General_2017_11_07', ind_vars_loc)
 summary(m_base)
 #save results
-write_summ(results_dir, 'base', m_base)
+write_summ(results_dir, 'base_2017', m_base)
 # calculate and plot predicted probabilities using Marginal Effect at the Means
 #   see ggeffects documentation for details, but numerical variables are set to the mean
 #   and effects for categorical variables are calculated  as a weighted average
@@ -292,7 +295,7 @@ base_pred<-predict_response(m_base, terms='location_category', margin='marginalm
 #plot predicted probabilities
 pred_prob_plot(base_pred, plot_title = 'Probability of Turning Out at Each Category of Location',
                dodge=0, xlab='Location Category',legend_title =NULL, angle=45,legend_position = 'none',
-               output_dir = plot_dir, image_name = 'Pred_Prob_Location_categories')
+               output_dir = plot_dir, image_name = 'Pred_Prob_Location_categories_2017')
 
 
 ##### Probability of turning out, If has/lacks child and is voting at a school
@@ -303,16 +306,16 @@ ind_vars_child_schl <-c(
   common_covars
 )
 # model
-m_schl<-log_reg(model_data, 'General_2018_11_06', ind_vars_child_schl)
+m_schl<-log_reg(model_data, 'General_2017_11_07', ind_vars_child_schl)
 summary(m_schl)
 #save results
-write_summ(results_dir, 'school', m_schl)
+write_summ(results_dir, 'school_2017', m_schl)
 ## Calculate and plot predicted probabilities
 schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='marginalmeans')
 #plot predicted probabilities
 pred_prob_plot(schl_pred, plot_title = 'Probability of Turning Out of (Non-)Parents (Not) Voting at Schools',
                xlab='Has a Child/Children', legend_title ='Votes at a School', angle=0,legend_position = 'right',
-               output_dir = plot_dir, image_name = 'Pred_Prob_child_school')
+               output_dir = plot_dir, image_name = 'Pred_Prob_child_school_2017')
 
 
 ##### Probability of turning out, if gov employee and is voting at gov building
@@ -323,17 +326,16 @@ ind_vars_gov_emp <-c(
   common_covars[! common_covars %in% c('CommercialData_OccupationIndustry')]
 )
 # model
-m_gov<-log_reg(model_data, 'General_2018_11_06', ind_vars_gov_emp)
+m_gov<-log_reg(model_data, 'General_2017_11_07', ind_vars_gov_emp)
 summary(m_gov)
 #save results
-write_summ(results_dir, 'gov_employees', m_gov)
-## Calculate and plot predicted probabilities
+write_summ(results_dir, 'gov_employees_2017', m_gov)
 ## Calculate and plot predicted probabilities
 gov_pred<-predict_response(m_gov, terms=c('known_gov_emp','pub_loc'), margin='marginalmeans')
 #plot predicted probabilities
 pred_prob_plot(gov_pred, plot_title = 'Probability of Turning Out of (Non-)Government Employees (Not) Voting at Public Buildings',
                xlab='Is a Government Employee', legend_title ='Votes at a Public Building', angle=0,legend_position = 'right',
-               output_dir = plot_dir, image_name = 'Pred_Prob_govemp_pub')
+               output_dir = plot_dir, image_name = 'Pred_Prob_govemp_pub_2017')
 
 
 ######### Probability of turning out, if known_republican at each building type
@@ -341,44 +343,33 @@ pred_prob_plot(gov_pred, plot_title = 'Probability of Turning Out of (Non-)Gover
 interactions<-paste('known_repub*',categories, sep='')
 ## remove parties variable
 repub_covars<-common_covars[! common_covars %in% c('Parties_Description')]
-## run models
-log_reg_inter_plus_plot(model_data, interaction_terms=interactions, ind_vars = repub_covars,
-              results_dir= results_dir, image_dir=plot_dir)
+## run models and plot results
+log_reg_inter_plus_plot(model_data,dep_var='General_2017_11_07', 
+                        interaction_terms=interactions, ind_vars = repub_covars,
+                        results_dir= results_dir, image_dir=plot_dir)
 
-## Calculate and plot predicted probabilities
-# Create dataframe for prediction
-new_data <- expand.grid(known_repub = c(TRUE,FALSE),
-                        relig_loc = c(TRUE,FALSE),
-                        Voters_Gender=levels(as.factor(model_data$Voters_Gender)),
-                        #Parties_Description=levels(as.factor(model_data$Parties_Description)),
-                        #pred_race=levels(as.factor(model_data$pred_race)),
-                        Voters_Age=mean(model_data$Voters_Age, na.rm=T), 
-                        CommercialData_Education=mean(model_data$CommercialData_Education, na.rm=T),
-)
-preds<-predict(m_repub, newdata=new_data, type='response', se.fit=T)
-pred_probs<-preds$fit
-pred_errs<-preds$se.fit
-#plot predictions
-grid_boxplot(m_repub, new_data, 'known_repub', 'relig_loc', 2, xlab='Is a Republican', 
-             ylab = 'Probability of Turning Out',color_lab = 'Votes at a Religious Building',
-             plot_dir=plot_dir, plot_name='repub_relig_pred_plot.png')
 
 ### Probability of turning out, if known_religious and is voting at religious building
 #vars
 ind_vars_relig <-c(
   # var of interest
   'known_religious*relig_loc',
-  # Demographics
-  'Voters_Gender', 'Voters_Age', 'Parties_Description',
-  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount',
-  # Race
-  'pred_race'
+  common_covars
 )
 # model
-m_relig<-log_reg(model_data, 'General_2018_11_06', ind_vars_relig)
+m_relig<-log_reg(model_data, 'General_2017_11_07', ind_vars_relig)
 summary(m_relig)
 #save results
-write_summ(results_dir, 'relig', m_relig)
+write_summ(results_dir, 'relig_2017', m_relig)
+## Calculate and plot predicted probabilities
+relig_pred<-predict_response(m_relig, terms=c('known_religious','relig_loc'), margin='marginalmeans')
+#plot predicted probabilities
+pred_prob_plot(relig_pred, plot_title = 'Probability of Turning Out of the (Non-)Religious (Not) Voting at Religious Buildings',
+               xlab='Is Religious', legend_title ='Votes at a Religious Building', angle=0,legend_position = 'right',
+               output_dir = plot_dir, image_name = 'Pred_Prob_relig_relig_2017')
+
+
+#######
 
 ### Probability of turning out, if black and voting at justice system building
 #vars
