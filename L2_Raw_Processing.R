@@ -108,24 +108,35 @@ demog_vars<-c('LALVOTERID',
 L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-VOTEHISTORY.tab', vote_vars)
 L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
 ## race estimates
-setwd(data_dir)
-load('PA_2016_race.Rdata')
-race16<-df.pred
-load('PA_2017_race.Rdata')
-race17<-df.pred
-load('PA_2018_race.Rdata')
-race18<-df.pred
-rm(df.pred)
+setwd(L2_dir)
+#load('PA_2016_race.Rdata')
+#race16<-df.pred
+race17<-read.csv('pa2017.csv')
+race18<-read.csv('pa2018.csv')
+#rm(df.pred)
+## Add year to predicted race
+race17<-race17%>%
+  rename(pred.whi_2017 = pred.whi,
+         pred.bla_2017 = pred.bla,
+         pred.his_2017 = pred.his,
+         pred.asi_2017 = pred.asi,
+         pred.oth_2017 = pred.oth)
+race18<-race18%>%
+  rename(pred.whi_2018 = pred.whi,
+         pred.bla_2018 = pred.bla,
+         pred.his_2018 = pred.his,
+         pred.asi_2018 = pred.asi,
+         pred.oth_2018 = pred.oth)
 # Combine L2 data
 L2demog<-left_join(L2demog, L2votehist, by = 'LALVOTERID')
 ## merge in race estimates
-L2demog<-left_join(L2demog, race16, by='LALVOTERID')
+#L2demog<-left_join(L2demog, race16, by='LALVOTERID')
 L2demog<-left_join(L2demog, race17, by='LALVOTERID')
 L2demog<-left_join(L2demog, race18, by='LALVOTERID')
 ### drop voterhistory
 rm(L2votehist)
 ### drop race imputations
-rm(race16, race17, race18)
+rm(race18)
 
 ################# merge L2 data with polling location data
 # Read in location/category data
@@ -184,6 +195,10 @@ L2demog$CommercialData_LikelyUnion<-as.factor(L2demog$CommercialData_LikelyUnion
 L2demog$CommercialData_OccupationIndustry[L2demog$CommercialData_OccupationIndustry==''] <- 'Unknown'
 ## factor
 L2demog$CommercialData_OccupationIndustry<-as.factor(L2demog$CommercialData_OccupationIndustry)
+# Replace blank with 'unknown' for occupation group
+L2demog$CommercialData_OccupationGroup[L2demog$CommercialData_OccupationGroup==''] <- 'Unknown'
+## factor
+L2demog$CommercialData_OccupationGroup<-as.factor(L2demog$CommercialData_OccupationGroup)
 
 ## Create Binary Variables
 # Convert household composition to child yes/no
