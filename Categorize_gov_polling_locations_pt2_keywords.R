@@ -126,6 +126,8 @@ union_wrds<-c('UNION', 'TEAMSTERS','UAW','U.E.','LOCAL')
 othr_wrds<-c('SENIOR', 'YOUTH','CHILD','OLDER ADULT','EARLY CHILDHOOD',
              'AGING','FOOD BANK')
 
+## Combine all word vectors for categories that will be subsumed into other
+othr_wrds<-
 
 ##################################################
 #set directories
@@ -133,11 +135,11 @@ cat_dir <- 'C:/Users/natha/Desktop/Polling Places/data'
 poll_dir <- 'C:/Users/natha/Desktop/Polling Places/data/gov_poll_places'
 plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
 # get poll location data and process
-filenames<-c('poll_struct_gov2018.csv', 'poll_struct_gov2019.csv',
-             'poll_struct_gov2020.csv', 'poll_struct_gov2021.csv',
-             'poll_struct_gov2022.csv', 'poll_struct_gov2023.csv')
+filenames<-c('poll_struct_govsource2018.csv', 'poll_struct_govsource2019.csv',
+             'poll_struct_govsource2020.csv', 'poll_struct_govsource2021.csv',
+             'poll_struct_govsource2022.csv', 'poll_struct_govsource2023.csv')
 for(file in filenames){
-  assign(paste0('poll_loc',substr(file,16,19)),
+  assign(paste0('poll_loc',substr(file,22,25)),
          # clean location names, removing some leading numbers (why need this again?)
          (rm_nums(
          # read in data
@@ -152,17 +154,17 @@ poll_dfs<-list('18'=poll_loc2018,'19'=poll_loc2019,'20'=poll_loc2020,'21'=poll_l
 ############### create keyword indices
 for (i in 1:length(poll_dfs)){
 ##vector of school polling locations
-schl_indx<-as.numeric(pollnamegrepl(schl_wrds, poll_dfs[[i]], 'Description'))
+school<-as.numeric(pollnamegrepl(schl_wrds, poll_dfs[[i]], 'Description'))
 
 #vector of religious polling locations
-relig_indx<-pollnamegrepl(relig_wrds, poll_dfs[[i]], 'Description')
+religious<-pollnamegrepl(relig_wrds, poll_dfs[[i]], 'Description')
 #Abbreviations for saint and church
 abbr_indx<-str_detect(poll_dfs[[i]]$Description, "(^ST[:space:])|(^ST\\.[:space:]*)|([:space:]CH$)")
-relig_indx<-relig_indx|abbr_indx
-relig_indx<-as.numeric(relig_indx)
+religious<-religious|abbr_indx
+religious<-as.numeric(religious)
 
 # Vector of public centers
-cent_indx<-as.numeric(pollnamegrepl(cent_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(cent_wrds, poll_dfs[[i]], 'Description'))
 
 # vector of fire stations
 fire_indx<-as.numeric(pollnamegrepl(fire_wrds, poll_dfs[[i]], 'Description'))
@@ -175,84 +177,69 @@ gov_indx<-gov_indx|boro_indx
 gov_indx<-as.numeric(gov_indx)
 
 # Combine vectors of government and fire
-gov_fire_indx<-as.numeric(gov_indx|fire_indx)
+public<-as.numeric(gov_indx|fire_indx)
 
 #vector of club polling locations
-club_indx<-as.numeric(grepl('CLUB', poll_dfs[[i]]$Description))
+other<-as.numeric(grepl('CLUB', poll_dfs[[i]]$Description))
 
 #Vector of apartments
-apt_indx<-pollnamegrepl(apt_wrds, poll_dfs[[i]], 'Description')
+other<-pollnamegrepl(apt_wrds, poll_dfs[[i]], 'Description')
 #Abbreviation for apartment
 ab_indx<-str_detect(poll_dfs[[i]]$Description, "(^APT[:space:])|([:space:]APTS$)")
-apt_indx<-apt_indx|ab_indx
-apt_indx<-as.numeric(apt_indx)
+other<-other|ab_indx
+other<-as.numeric(other)
 
 #vector of library polling locations
-lib_indx<-as.numeric(grepl('LIBRARY', poll_dfs[[i]]$Description))
+library<-as.numeric(grepl('LIBRARY', poll_dfs[[i]]$Description))
 
 # vector of veterans associations
-vet_indx<-as.numeric(pollnamegrepl(vet_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(vet_wrds, poll_dfs[[i]], 'Description'))
 
 # Vector of senior centers
-sen_indx<-as.numeric(pollnamegrepl(sen_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(sen_wrds, poll_dfs[[i]], 'Description'))
 
 #vector of association polling locations
-assc_indx<-as.numeric(pollnamegrepl(assc_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(assc_wrds, poll_dfs[[i]], 'Description'))
 
 #vector of sports polling locations
-sport_indx<-as.numeric(pollnamegrepl(sport_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(sport_wrds, poll_dfs[[i]], 'Description'))
 
 #vector of military polling locations
-milit_indx<-as.numeric(pollnamegrepl(milit_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(milit_wrds, poll_dfs[[i]], 'Description'))
 
 #vector of union polling locations
-union_indx<-as.numeric(pollnamegrepl(union_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(union_wrds, poll_dfs[[i]], 'Description'))
 
 #vector of other polling locations
-othr_indx<-as.numeric(pollnamegrepl(othr_wrds, poll_dfs[[i]], 'Description'))
+other<-as.numeric(pollnamegrepl(othr_wrds, poll_dfs[[i]], 'Description'))
 
 ################### master index combining all location vectors
-master_index<-as.data.frame(cbind(lib_indx, gov_fire_indx, cent_indx, relig_indx, 
-                                  schl_indx, apt_indx,club_indx, 
-                                  vet_indx, sen_indx,assc_indx,sport_indx,
-                                  milit_indx,union_indx,othr_indx))
+master_index<-as.data.frame(cbind(library, public, other, religious, 
+                                  school))
 # create new category for locations with multiple keywords
 master_index<-master_index%>%
-  mutate(keyword_count = rowSums(across(c(lib_indx, gov_fire_indx, cent_indx, relig_indx, 
-                                          schl_indx, apt_indx,club_indx, 
-                                          vet_indx, sen_indx,assc_indx,sport_indx,
-                                          milit_indx,union_indx,othr_indx)))) %>%
+  mutate(keyword_count = rowSums(across(c(library, public, other, religious, 
+                                          school, other)))) %>%
   mutate(mult_indx = case_when(keyword_count == 0 ~ 0, keyword_count == 1 ~ 0,
                                .default = 1))
 ## save copy of matrix
-#setwd("C:/Users/natha/Desktop/Polling Places/data/Structures")
-#write.csv(master_index, 'keyword_matrix.csv')
+setwd("C:/Users/natha/Desktop/Polling Places/data/Structures")
+write.csv(master_index, 'keyword_matrix.csv')
 
 ############## merge poll and keyword index
 polltest<-cbind(poll_dfs[[i]], master_index)
 #add in keyword codings conditionally
 polltest<-polltest%>%
   mutate(location_category = case_when(mult_indx==1&is.na(location_category) ~ 'multiple',
-                                       lib_indx==1&is.na(location_category) ~ 'library',
-                                       gov_fire_indx==1&is.na(location_category) ~ 'public',
-                                       cent_indx==1&is.na(location_category) ~ 'other',
-                                       relig_indx==1&schl_indx==1&is.na(location_category) ~ 'religious_school',
-                                       relig_indx==1&is.na(location_category) ~ 'religious',
-                                       schl_indx==1&is.na(location_category) ~ 'school',
-                                       apt_indx==1&is.na(location_category) ~ 'other',
-                                       club_indx==1&is.na(location_category) ~ 'other',
-                                       vet_indx==1&is.na(location_category) ~ 'other',
-                                       sen_indx==1&is.na(location_category) ~ 'other',
-                                       assc_indx==1&is.na(location_category) ~ 'other',
-                                       sport_indx==1&is.na(location_category) ~ 'other',
-                                       milit_indx==1&is.na(location_category) ~ 'other',
-                                       union_indx==1&is.na(location_category) ~ 'other',
-                                       othr_indx==1&is.na(location_category) ~ 'other',
+                                       library==1&is.na(location_category) ~ 'library',
+                                       public==1&is.na(location_category) ~ 'public',
+                                       other==1&is.na(location_category) ~ 'other',
+                                       religious==1&school==1&is.na(location_category) ~ 'religious_school',
+                                       religious==1&is.na(location_category) ~ 'religious',
+                                       school==1&is.na(location_category) ~ 'school',
                                        .default = location_category)) %>%
   #remove columns
-  select(!c(mult_indx,lib_indx,gov_fire_indx,cent_indx,relig_indx,schl_indx,apt_indx,
-            club_indx,vet_indx,sen_indx,assc_indx,sport_indx,
-            milit_indx,union_indx,othr_indx))
+  select(!c(mult_indx,library,public,other,religious,school,other))
 
 
 #calc missingness by checking which addresses are in structure list
