@@ -71,9 +71,15 @@ log_reg_inter<-function(df,dep_var='General_2018_11_06', interaction_terms,
     # model
     model<-log_reg(df, dep_var, ind_vars_list)
     summary(model)
-    #save results
+    ## get first variable in interaction term
     first_term<-str_extract(interaction, ".*(?=\\*)")
-    write_summ(results_dir, paste0(substr(interaction,1,nchar(first_term)),'x',substr(interaction,(nchar(first_term)+2),100),'_summary'), model)
+    second_term<-str_extract(interaction, "(?<=\\*).*")
+    ## predict
+    model_pred<-predict_response(model, terms=c(first_term,second_term), 
+                                 margin='marginalmeans')
+    #save results
+    write_summ(results_dir, paste0(first_term,'x',second_term,
+                                   substr(dep_var,9,12),'_summary'), model)
   }
 }
 
@@ -83,6 +89,8 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
                                    'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
                                    'known_religious','CommercialData_LikelyUnion', 
                                    'CommercialData_OccupationIndustry'),
+                        x_label, x_axis_labels = c('FALSE','TRUE'), loc_dict, var_dict,
+                        vjust_value=0, hjust_value=0,
                         results_dir, image_dir){
   for(interaction in interaction_terms){
     print(interaction)
@@ -93,26 +101,25 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
     # calculate predicted probabilities
     ## get first variable in interaction term
     first_term<-str_extract(interaction, ".*(?=\\*)")
+    second_term<-str_extract(interaction, "(?<=\\*).*")
     ## predict
-    model_pred<-predict_response(model, terms=c(substr(interaction,1,nchar(first_term)), 
-                                                substr(interaction,(nchar(first_term)+2),100)), 
+    model_pred<-predict_response(model, terms=c(first_term,second_term), 
                                  margin='marginalmeans')
     #save results
-    write_summ(results_dir, paste0(substr(interaction,1,nchar(first_term)),'x',
-                                   substr(interaction,(nchar(first_term)+2),100),
+    write_summ(results_dir, paste0(first_term,'x',second_term,
                                    substr(dep_var,9,12),'_summary'), model)
     # Generate plot details
-    plot_title=paste0('Probability of Turning Out for', substr(interaction,1,nchar(first_term)),
-                      'x',
-                      substr(interaction,(nchar(first_term)+2),100))
-    xlab = 'Known Republican' #make dynamic
-    legend_title = substr(interaction,(nchar(first_term)+2),100)
-    output_dir = image_dir
-    image_name = paste0('Pred_Prob_',substr(interaction,1,nchar(first_term)),'x',
-                        substr(interaction,(nchar(first_term)+2),100),
+    plot_title=paste0(substr(dep_var,9,12),' Probability of Voting for ', 
+                      var_dict[first_term][[1]], ' at ', loc_dict[second_term][[1]])
+    legend_title = loc_dict[second_term][[1]]
+    image_name = paste0('Pred_Prob_',first_term,'x',loc_dict[second_term][[1]],
                         substr(dep_var,9,12))
-    pred_prob_plot(model_pred, dodge=0.8, plot_title, xlab, ylab='Predicted Probability of Turning Out',
-                   legend_title, angle=0, legend_position='right', output_dir, image_name)
+    pred_prob_plot(model_data=df, dep_var=dep_var, 
+                   model_pred, plot_title=plot_title, dodge=0.8, xlab=x_label, 
+                   x_axis_labels = x_axis_labels, ylab='Predicted Probability of Voting', 
+                   legend_exist = T, legend_title = legend_title, angle = 0, 
+                   vjust_value = vjust_value, hjust_value=hjust_value, legend_position='right', 
+                   output_dir=image_dir, image_name=image_name)
   }
 }
 
@@ -142,21 +149,30 @@ log_reg_inter_plus_margins<-function(df,dep_var='General_2018_11_06', interactio
 }
 
 #plot predicted probabilities
-pred_prob_plot<-function(pred_probs_obj, dodge=0.8, plot_title, xlab, ylab='Predicted Probability of Turning Out',
-                         legend_title, angle=0, legend_position='right', output_dir, image_name){
+pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, plot_title, 
+                         xlab, x_axis_labels, ylab='Predicted Probability of Voting',
+                         legend_exist=TRUE, legend_title, angle=0, hjust_value=0, 
+                         vjust_value=0,
+                         legend_position='right', output_dir, image_name){
   g<-ggplot(pred_probs_obj, aes(x, predicted, color=group))+
-    geom_point(size=3, position=position_dodge(dodge))+
+    geom_point(size=3, position=position_dodge(dodge), show.legend = legend_exist)+
     geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
-                  width=0.2, linewidth=1, position=position_dodge(dodge))+
+                  width=0.2, linewidth=1, position=position_dodge(dodge), 
+                  show.legend = legend_exist)+
+    # draw line at mean voting rate
+    geom_hline(aes(yintercept = mean(model_data[[dep_var]]), linetype=''), color='black')+
+    scale_linetype_manual(name = "Mean Voting Rate", values=1, guide = guide_legend(override.aes = list(color = c("black"))))+
     labs(title = plot_title,
          x = xlab,
          y = ylab) +
     scale_color_discrete(name = legend_title)+
     scale_y_continuous(labels = scales::percent)+
-    theme(plot.title = element_text(size=20),
+    scale_x_discrete(labels= x_axis_labels)+
+    theme(plot.title = element_text(size=20, face='bold'),
           axis.title = element_text(size=15),
-          axis.text.y = element_text(size=15),
-          axis.text.x = element_text(size=12, angle=angle,),
+          axis.text.y = element_text(size=17),
+          axis.text.x = element_text(size=12, angle=angle,hjust = hjust_value,
+                                     vjust = vjust_value),
           legend.title = element_text(size=20),
           legend.text = element_text(size=15),
           legend.key.size = unit(1, 'cm'),
@@ -165,64 +181,6 @@ pred_prob_plot<-function(pred_probs_obj, dodge=0.8, plot_title, xlab, ylab='Pred
   setwd(output_dir)
   ggsave(file=paste0(image_name,'.png'), device='png', width=3000, height=2000, units='px', g) #saves g
 }
-
-
-# Make and plot predictions for interaction models for specific value of indp vars
-boxplot_preds <- function(model, plotdata, var1, var2, num_ran_vars, xlab, ylab, color_lab, 
-                          dir, plot_name){
-  #calculate predicted probabilities
-  preds<-predict(model, newdata=plotdata, type='response', se.fit=T)
-  pred_probs<-preds$fit
-  pred_errs<-preds$se.fit
-  # Plot predictions
-  ## create plot title based on random variable values
-  var_settings = c()
-  for(i in 1:num_ran_vars){
-    var_settings=c(var_settings, paste0(colnames(plotdata)[i+2],': ',plotdata[[i+2]][1]))
-  }
-  plot_title=paste0(var_settings, collapse='\n')
-  # plot
-  pred_plot<-ggplot(plotdata, aes(x = plotdata[[var1]], y = pred_probs, 
-                                  color = factor(plotdata[[var2]]))) +
-    geom_boxplot() +
-    geom_errorbar(aes(ymin=pred_probs-1.96*pred_errs,
-                      ymax=pred_probs+1.96*pred_errs),
-                  width=0.2, position=position_dodge(0.8))+
-    labs(x = xlab, y = ylab, fill = color_lab, 
-         title = plot_title) +
-    scale_color_discrete(name = color_lab)+
-    theme(plot.title = element_text(size=10),
-          axis.title = element_text(size = 10),
-          legend.position = "none")
-  setwd(dir)
-  return(pred_plot)
-}
-
-# Make grid of multiple boxplots 
-#   of predictions for interaction models for specific value of indp vars
-grid_boxplot <- function(model, data, var1, var2, num_ran_vars, xlab, ylab, color_lab, 
-                         plot_dir, plot_name){
-  num_rows=nrow(data)
-  num_plots = num_rows/4
-  start <- seq(from = 1, to = num_rows-3, by = 4)
-  end <- seq(from = 4, to = num_rows, by = 4)
-  plots_list<-list()
-  for(i in 1:num_plots){
-    p<-boxplot_preds(model=model, plotdata=data[start[i]:end[i],], var1 = var1, 
-                     var2=var2, xlab = xlab, ylab = ylab, color_lab = color_lab,
-                     num_ran_vars = num_ran_vars, dir=plot_dir, plot_name=plot_name)
-    plots_list[[i]]<-p
-  }
-  setwd(plot_dir)
-  ncols<-ceiling(sqrt(num_plots)) # can add 1 extra plot for legend
-  nrows<-ceiling((num_plots)/ncols)
-  grid.arrange(grobs=plots_list, ncol=ncols, nrow=nrows)
-  g <- arrangeGrob(grobs=plots_list, ncol=ncols, nrow=nrows) #generates g for saving
-  ggsave(file=plot_name, device='png', width=2000, height=2000, units='px', g) #saves g
-  #ggsave(plot_name, device='png', width=2000, height=2000, units='px')
-}
-
-
 
 
 ########################################################### Main
@@ -261,7 +219,8 @@ model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = 
 model_data$pred_race <- as.factor(model_data$pred_race)
 model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi_2018")
 # Factorize any other variables we're using
-col_names<-c('CommercialData_LikelyUnion','CommercialData_OccupationIndustry',
+col_names<-c('CommercialData_LikelyUnion', 'CommercialData_OccupationGroup', 
+             'CommercialData_OccupationIndustry',
              'has_child','known_religious','known_gov_emp','known_repub',
              'pub_loc','pub_just','other','relig_loc','school','multiple','justice_loc',
              'library','relig_school')
@@ -274,39 +233,68 @@ model_data<-droplevels(model_data)
 
 ## create vector of location categories
 categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
-              'justice_loc','library','relig_school ')
+              'justice_loc','library','relig_school')
+## Create vector of location category labels
+loc_labels<-c('Other','Justice Location','Library','Multiple Categories',
+              'Public Location','Public/Justice Location','Religious Location',
+              'Religious School','School')
+## Create dictionary of location labels
+loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
+            'other'='Other','relig_loc'='Religious Location','school'='School',
+            'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
+            'library'='Library', 'relig_school'='Religious School')
+## Create dictionary of variable labels
+var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
+            'CommercialData_EstimatedHHIncomeAmount'='Estimated HH Income',
+            'Residence_Families_HHCount'='HH Resident Count',
+            'known_religious'='Known Religious',
+            'CommercialData_LikelyUnion'='Likely Union Member', 
+            'CommercialData_OccupationIndustry'='Occupation Industry',
+            'CommercialData_OccupationIndustry'='Occupation Group',
+            'has_child'='Has Child(ren)','known_gov_emp'='Known Government Employee',
+            'Parties_Description'='Political Party','pred_race'='Predicted Race')
 
 #################### Logistic Regression
 ## Common set of covariates
 common_covars <-c(
   # Demographics
   'Voters_Gender', 'Voters_Age', 'Parties_Description',
+  'pred_race',
   'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
   'known_religious','CommercialData_LikelyUnion', 
-  'CommercialData_OccupationIndustry'
+  'CommercialData_OccupationGroup'
 )
 
-##### Probability of turning out, Location category as predictor
+##set dependent variable
+dep_var = 'General_2017_11_07'
+year=substr(dep_var,9,12)
+
+##### Probability of Voting, Location category as predictor
 ind_vars_loc<-c('location_category',common_covars)
 # locations model
 #m_base<-log_reg_plus_margins(model_data, 'General_2018_11_06', ind_vars_loc, 
 #                             'location_category', results_dir, 'base')
-m_base<-log_reg(model_data, 'General_2017_11_07', ind_vars_loc)
+m_base<-log_reg(model_data, dep_var, ind_vars_loc)
 summary(m_base)
 #save results
-write_summ(results_dir, 'base_2017', m_base)
+write_summ(results_dir, paste0('base_',year), m_base)
 # calculate and plot predicted probabilities using Marginal Effect at the Means
 #   see ggeffects documentation for details, but numerical variables are set to the mean
 #   and effects for categorical variables are calculated  as a weighted average
 #   over the factor levels. Should come closer to sample 'average observation' 
-base_pred<-predict_response(m_base, terms='location_category', margin='marginalmeans')
+base_pred<-predict_response(m_base, terms='location_category', margin='marginalmeans',
+                            rg.limit = 12000)
 #plot predicted probabilities
-pred_prob_plot(base_pred, plot_title = 'Probability of Turning Out at Each Category of Location',
-               dodge=0, xlab='Location Category',legend_title =NULL, angle=45,legend_position = 'none',
-               output_dir = plot_dir, image_name = 'Pred_Prob_Location_categories_2017')
+pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, 
+               plot_title = paste0(year,' Probability of Voting at Each Category of Location'),
+               dodge=0, xlab='Location Category', x_axis_labels = loc_labels,
+               legend_exist=F,legend_title =NULL, angle=45, hjust_value=0.5, 
+               vjust_value=0.7,
+               legend_position = 'right', output_dir = plot_dir, 
+               image_name = paste0('Pred_Prob_Location_categories_',year))
 
 
-##### Probability of turning out, If has/lacks child and is voting at a school
+##### Probability of Voting, If has/lacks child and is voting at a school
 #vars
 ind_vars_child_schl <-c(
   # var of interest
@@ -314,19 +302,21 @@ ind_vars_child_schl <-c(
   common_covars
 )
 # model
-m_schl<-log_reg(model_data, 'General_2017_11_07', ind_vars_child_schl)
+m_schl<-log_reg(model_data, 'General_2018_11_06', ind_vars_child_schl)
 summary(m_schl)
 #save results
-write_summ(results_dir, 'school_2017', m_schl)
+write_summ(results_dir, 'school_2018', m_schl)
 ## Calculate and plot predicted probabilities
 schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='marginalmeans')
 #plot predicted probabilities
-pred_prob_plot(schl_pred, plot_title = 'Probability of Turning Out of (Non-)Parents (Not) Voting at Schools',
-               xlab='Has a Child/Children', legend_title ='Votes at a School', angle=0,legend_position = 'right',
-               output_dir = plot_dir, image_name = 'Pred_Prob_child_school_2017')
+pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, 
+               plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations'),
+               xlab='Has a Child/Children', x_axis_labels = c('FALSE', 'TRUE'),
+               legend_exist=T, legend_title ='Votes at a School', angle=0,legend_position = 'right',
+               output_dir = plot_dir, image_name = 'Pred_Prob_child_school_2018')
 
 
-##### Probability of turning out, if gov employee and is voting at gov building
+##### Probability of Voting, if gov employee and is voting at gov building
 #vars
 ind_vars_gov_emp <-c(
   # var of interest
@@ -334,30 +324,35 @@ ind_vars_gov_emp <-c(
   common_covars[! common_covars %in% c('CommercialData_OccupationIndustry')]
 )
 # model
-m_gov<-log_reg(model_data, 'General_2017_11_07', ind_vars_gov_emp)
+m_gov<-log_reg(model_data, 'General_2018_11_06', ind_vars_gov_emp)
 summary(m_gov)
 #save results
-write_summ(results_dir, 'gov_employees_2017', m_gov)
+write_summ(results_dir, 'gov_employees_2018', m_gov)
 ## Calculate and plot predicted probabilities
 gov_pred<-predict_response(m_gov, terms=c('known_gov_emp','pub_loc'), margin='marginalmeans')
 #plot predicted probabilities
-pred_prob_plot(gov_pred, plot_title = 'Probability of Turning Out of (Non-)Government Employees (Not) Voting at Public Buildings',
-               xlab='Is a Government Employee', legend_title ='Votes at a Public Building', angle=0,legend_position = 'right',
-               output_dir = plot_dir, image_name = 'Pred_Prob_govemp_pub_2017')
+pred_prob_plot(model_data=model_data, dep_var=dep_var, gov_pred, 
+               plot_title = paste0(year,' Probability of Voting of (Non-)Government Employees at Public Locations'),
+               xlab='Is a Government Employee', x_axis_labels = c('FALSE', 'TRUE'),
+               legend_exist=T, legend_title ='Votes at a Public Building', 
+               angle=0,legend_position = 'right', output_dir = plot_dir, 
+               image_name = 'Pred_Prob_govemp_pub_2018')
 
 
-######### Probability of turning out, if known_republican at each building type
+######### Probability of Voting, if known_republican at each building type
 ## create interaction terms
-interactions<-paste('known_repub*',categories, sep='')
+interactions<-paste('Parties_Description*',categories, sep='')
 ## remove parties variable
 repub_covars<-common_covars[! common_covars %in% c('Parties_Description')]
 ## run models and plot results
-log_reg_inter_plus_plot(model_data,dep_var='General_2017_11_07', 
+log_reg_inter_plus_plot(model_data, dep_var='General_2018_11_06', 
                         interaction_terms=interactions, ind_vars = repub_covars,
-                        results_dir= results_dir, image_dir=plot_dir)
+                        x_label='Party', x_axis_labels=c('Democrat','Other','Republican'),
+                        hjust_value=0.5,loc_dict = loc_dict, var_dict=var_dict,
+                        results_dir = results_dir, image_dir=plot_dir)
 
 
-### Probability of turning out, if known_religious at each building type
+### Probability of Voting, if known_religious at each building type
 ## create interaction terms
 interactions<-paste('known_religious*',categories, sep='')
 ## remove religion variable
@@ -365,30 +360,16 @@ relig_covars<-common_covars[! common_covars %in% c('known_religious')]
 ## run models and plot results
 log_reg_inter_plus_plot(model_data,dep_var='General_2018_11_06', 
                         interaction_terms=interactions, ind_vars = relig_covars,
+                        x_label='Known Religious',x_axis_labels=c('FALSE','TRUE'),
+                        loc_dict = loc_dict, var_dict=var_dict,
                         results_dir= results_dir, image_dir=plot_dir)
 
-#vars
-ind_vars_relig <-c(
-  # var of interest
-  'known_religious*relig_loc',
-  common_covars
-)
-# model
-m_relig<-log_reg(model_data, 'General_2017_11_07', ind_vars_relig)
-summary(m_relig)
-#save results
-write_summ(results_dir, 'relig_2017', m_relig)
-## Calculate and plot predicted probabilities
-relig_pred<-predict_response(m_relig, terms=c('known_religious','relig_loc'), margin='marginalmeans')
-#plot predicted probabilities
-pred_prob_plot(relig_pred, plot_title = 'Probability of Turning Out of the (Non-)Religious (Not) Voting at Religious Buildings',
-               xlab='Is Religious', legend_title ='Votes at a Religious Building', angle=0,legend_position = 'right',
-               output_dir = plot_dir, image_name = 'Pred_Prob_relig_relig_2017')
+
 
 
 #######
 
-### Probability of turning out, if black and voting at justice system building
+### Probability of Voting, if black and voting at justice system building
 #vars
 ind_vars_blk_just <-c(
   # var of interest
@@ -404,38 +385,4 @@ summary(m_blk)
 write_summ(results_dir, 'black', m_blk)
 
 
-
-
-#####################
-# Create dataframe for prediction
-new_data <- expand.grid(has_child = c(TRUE,FALSE),
-                        school = c(TRUE,FALSE),
-                        Voters_Gender=levels(as.factor(model_data$Voters_Gender)),
-                        Parties_Description=levels(as.factor(model_data$Parties_Description)),
-                        #pred_race=levels(as.factor(model_data$pred_race)),
-                        Voters_Age=mean(model_data$Voters_Age, na.rm=T), 
-                        CommercialData_EstimatedHHIncomeAmount = mean(model_data$CommercialData_EstimatedHHIncomeAmount, na.rm=T),
-                        Residence_Families_HHCount=mean(model_data$Residence_Families_HHCount, na.rm=T),
-                        known_religious=c(TRUE,FALSE),
-                        CommercialData_LikelyUnion =levels(as.factor(model_data$CommercialData_LikelyUnion)),
-                        CommercialData_OccupationIndustry=levels(as.factor(model_data$CommercialData_OccupationIndustry))
-)
-preds<-predict(m_schl, newdata=new_data, type='response', se.fit=T)
-pred_probs<-preds$fit
-pred_errs<-preds$se.fit
-#plot predictions
-p1<-boxplot_preds(model=m_schl, plotdata=new_data[1:4,], var1 = 'has_child', 
-                  var2='school', xlab = 'Has a child/children',
-                  num_ran_vars=2,
-                  ylab = 'Probability of Turning Out',color_lab = 'Votes at a School',
-                  dir=plot_dir, plot_name='child_schl_pred_plot.png')
-p2<-boxplot_preds(model=m_schl, plotdata=new_data[5:8,], var1 = 'has_child', 
-                  var2='school', xlab = 'Has a child/children', 
-                  num_ran_vars=2,
-                  ylab = 'Probability of Turning Out',color_lab = 'Votes at a School',
-                  dir=plot_dir, plot_name='child_schl_pred_plot.png')
-grid.arrange(p1,p2,nrow=1)
-grid_boxplot(m_schl, new_data, 'has_child', 'school', 2, xlab='Has a child/children', 
-             ylab = 'Probability of Turning Out',color_lab = 'Votes at a School',
-             plot_dir=plot_dir, plot_name='child_schl_pred_plot.png')
 
