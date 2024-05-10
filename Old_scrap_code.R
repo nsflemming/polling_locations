@@ -105,3 +105,21 @@ relig_pred<-predict_response(m_relig, terms=c('known_religious','relig_loc'), ma
 pred_prob_plot(relig_pred, plot_title = 'Probability of Voting of the (Non-)Religious at Religious Locations',
                xlab='Is Religious', legend_title ='Votes at a Religious Building', angle=0,legend_position = 'right',
                output_dir = plot_dir, image_name = 'Pred_Prob_relig_relig_2017')
+
+
+#######
+
+### Probability of Voting, if black and voting at justice system building
+#vars
+ind_vars_blk_just <-c(
+  # var of interest
+  'pred_black*justice_loc',
+  # Demographics
+  'Voters_Gender', 'Voters_Age', 'Parties_Description',
+  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount'
+)
+# model
+m_blk<-log_reg(model_data, 'General_2018_11_06', ind_vars_blk_just)
+summary(m_blk)
+#save results
+write_summ(results_dir, 'black', m_blk)
