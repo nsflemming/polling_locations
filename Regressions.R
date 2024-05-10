@@ -31,8 +31,8 @@ log_reg <- function(data, dep_var, ind_vars){
   return(m_base)
 }
 
-## Logistic regression + marginal effects
-log_reg_plus_margins <- function(data, dep_var, ind_vars, var_of_int, save_dir, model_name){
+## Logistic regression + average marginal effects
+log_reg_plus_margins <- function(data, dep_var, ind_vars, var_of_interest, save_dir, model_name){
   ind_vars_coll <- paste(ind_vars, collapse = '+')
   #print(ind_vars_coll)
   formula = paste0(dep_var,'~',ind_vars_coll)
@@ -40,7 +40,7 @@ log_reg_plus_margins <- function(data, dep_var, ind_vars, var_of_int, save_dir, 
                 formula,
                 family = "binomial")
   # calculate Average Marginal Effect
-  base_margins<-margins(m_base, variables=var_of_int)
+  base_margins<-margins(m_base, variables=var_of_interest)
   #save marginal effects
   setwd(save_dir)
   sink(file=paste0("MarginsSummary_",model_name,".txt"))
@@ -89,6 +89,7 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
                                    'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
                                    'known_religious','CommercialData_LikelyUnion', 
                                    'CommercialData_OccupationIndustry'),
+                        turnout,
                         x_label, x_axis_labels = c('FALSE','TRUE'), loc_dict, var_dict,
                         vjust_value=0, hjust_value=0,
                         results_dir, image_dir){
@@ -114,8 +115,8 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
     legend_title = loc_dict[second_term][[1]]
     image_name = paste0('Pred_Prob_',first_term,'x',loc_dict[second_term][[1]],
                         substr(dep_var,9,12))
-    pred_prob_plot(model_data=df, dep_var=dep_var, 
-                   model_pred, plot_title=plot_title, dodge=0.8, xlab=x_label, 
+    pred_prob_plot(model_data=df, dep_var=dep_var, model_pred, mean_vote=turnout, 
+                   plot_title=plot_title, dodge=0.8, xlab=x_label, 
                    x_axis_labels = x_axis_labels, ylab='Predicted Probability of Voting', 
                    legend_exist = T, legend_title = legend_title, angle = 0, 
                    vjust_value = vjust_value, hjust_value=hjust_value, legend_position='right', 
@@ -140,19 +141,20 @@ log_reg_inter_plus_margins<-function(df,dep_var='General_2018_11_06', interactio
     base_margins<-margins(model, variables = var_of_int)
     #save marginal effects
     setwd(save_dir)
-    sink(file=paste0("MarginsSummary_",paste0(substr(interaction,1,11),'x',substr(interaction,13,100)),".txt")) #make dynamic
+    sink(file=paste0("AMEMarginsSummary_",paste0(substr(interaction,1,11),'x',substr(interaction,13,100)),".txt")) #make dynamic
     print(summary(base_margins))
     sink()
     #save results
-    write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),'_summary'), model)
+    write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),'_AMEsummary'), model)
   }
 }
 
 #plot predicted probabilities
-pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, plot_title, 
+pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, mean_vote,
+                         plot_title, 
                          xlab, x_axis_labels, ylab='Predicted Probability of Voting',
-                         legend_exist=TRUE, legend_title, angle=0, hjust_value=0, 
-                         vjust_value=0,
+                         legend_exist=TRUE, legend_title, angle=0, 
+                         hjust_value=0, vjust_value=0,
                          legend_position='right', output_dir, image_name){
   g<-ggplot(pred_probs_obj, aes(x, predicted, color=group))+
     geom_point(size=3, position=position_dodge(dodge), show.legend = legend_exist)+
@@ -160,8 +162,8 @@ pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, plot_ti
                   width=0.2, linewidth=1, position=position_dodge(dodge), 
                   show.legend = legend_exist)+
     # draw line at mean voting rate
-    geom_hline(aes(yintercept = mean(model_data[[dep_var]]), linetype=''), color='black')+
-    scale_linetype_manual(name = "Mean Voting Rate", values=1, guide = guide_legend(override.aes = list(color = c("black"))))+
+    #geom_hline(aes(yintercept = mean_vote, linetype=''), color='black')+
+    #scale_linetype_manual(name = "Mean Voting Rate", values=1, guide = guide_legend(override.aes = list(color = c("black"))))+
     labs(title = plot_title,
          x = xlab,
          y = ylab) +
@@ -171,7 +173,7 @@ pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, plot_ti
     theme(plot.title = element_text(size=20, face='bold'),
           axis.title = element_text(size=15),
           axis.text.y = element_text(size=17),
-          axis.text.x = element_text(size=12, angle=angle,hjust = hjust_value,
+          axis.text.x = element_text(size=15, angle=angle,hjust = hjust_value,
                                      vjust = vjust_value),
           legend.title = element_text(size=20),
           legend.text = element_text(size=15),
@@ -268,6 +270,8 @@ common_covars <-c(
 ##set dependent variable
 dep_var = 'General_2017_11_07'
 year=substr(dep_var,9,12)
+### calculate turnout for election
+turnout <- mean(model_data[[dep_var]], na.rm=T)
 
 ##### Probability of Voting, Location category as predictor
 ind_vars_loc<-c('location_category',common_covars)
@@ -285,14 +289,16 @@ write_summ(results_dir, paste0('base_',year), m_base)
 base_pred<-predict_response(m_base, terms='location_category', margin='marginalmeans',
                             rg.limit = 12000)
 #plot predicted probabilities
-pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, 
+pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=turnout,
                plot_title = paste0(year,' Probability of Voting at Each Category of Location'),
                dodge=0, xlab='Location Category', x_axis_labels = loc_labels,
-               legend_exist=F,legend_title =NULL, angle=45, hjust_value=0.5, 
-               vjust_value=0.7,
+               legend_exist=F,legend_title =NULL, angle=45, hjust_value=1, 
+               vjust_value=1,
                legend_position = 'right', output_dir = plot_dir, 
                image_name = paste0('Pred_Prob_Location_categories_',year))
 
+## AME for base model (takes too long to run)
+#ame_pred<-predict_response(m_base, terms='location_category', margin='empirical')
 
 ##### Probability of Voting, If has/lacks child and is voting at a school
 #vars
@@ -309,7 +315,7 @@ write_summ(results_dir, 'school_2018', m_schl)
 ## Calculate and plot predicted probabilities
 schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='marginalmeans')
 #plot predicted probabilities
-pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, 
+pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = turnout,
                plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations'),
                xlab='Has a Child/Children', x_axis_labels = c('FALSE', 'TRUE'),
                legend_exist=T, legend_title ='Votes at a School', angle=0,legend_position = 'right',
@@ -331,7 +337,7 @@ write_summ(results_dir, 'gov_employees_2018', m_gov)
 ## Calculate and plot predicted probabilities
 gov_pred<-predict_response(m_gov, terms=c('known_gov_emp','pub_loc'), margin='marginalmeans')
 #plot predicted probabilities
-pred_prob_plot(model_data=model_data, dep_var=dep_var, gov_pred, 
+pred_prob_plot(model_data=model_data, dep_var=dep_var, gov_pred, mean_vote = turnout,
                plot_title = paste0(year,' Probability of Voting of (Non-)Government Employees at Public Locations'),
                xlab='Is a Government Employee', x_axis_labels = c('FALSE', 'TRUE'),
                legend_exist=T, legend_title ='Votes at a Public Building', 
@@ -347,6 +353,7 @@ repub_covars<-common_covars[! common_covars %in% c('Parties_Description')]
 ## run models and plot results
 log_reg_inter_plus_plot(model_data, dep_var='General_2018_11_06', 
                         interaction_terms=interactions, ind_vars = repub_covars,
+                        turnout = turnout,
                         x_label='Party', x_axis_labels=c('Democrat','Other','Republican'),
                         hjust_value=0.5,loc_dict = loc_dict, var_dict=var_dict,
                         results_dir = results_dir, image_dir=plot_dir)
@@ -360,29 +367,11 @@ relig_covars<-common_covars[! common_covars %in% c('known_religious')]
 ## run models and plot results
 log_reg_inter_plus_plot(model_data,dep_var='General_2018_11_06', 
                         interaction_terms=interactions, ind_vars = relig_covars,
+                        turnout = turnout,
                         x_label='Known Religious',x_axis_labels=c('FALSE','TRUE'),
                         loc_dict = loc_dict, var_dict=var_dict,
                         results_dir= results_dir, image_dir=plot_dir)
 
-
-
-
-#######
-
-### Probability of Voting, if black and voting at justice system building
-#vars
-ind_vars_blk_just <-c(
-  # var of interest
-  'pred_black*justice_loc',
-  # Demographics
-  'Voters_Gender', 'Voters_Age', 'Parties_Description',
-  'CommercialData_Education','CommercialData_EstimatedHHIncomeAmount'
-)
-# model
-m_blk<-log_reg(model_data, 'General_2018_11_06', ind_vars_blk_just)
-summary(m_blk)
-#save results
-write_summ(results_dir, 'black', m_blk)
 
 
 
