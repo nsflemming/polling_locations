@@ -76,3 +76,16 @@ categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
 ############################ Crosstab of voting frequency at location categories
 votetable<-table(model_data$General_2018_11_06, model_data$location_category)
 prop.table(votetable, 2)
+
+############################ Frequency of voting at each location category
+dep_var = 'General_2017_11_07'
+year=substr(dep_var,9,12)
+
+### calculate turnout by location category?
+pub_loc_vote<-sum((model_data$General_2017_11_07&model_data$location_category=='public'), na.rm=T)/sum(model_data$location_category=='public', na.rm=T)
+turnout_by_cat<-model_data%>%
+  mutate('pub_loc_vote'=(sum(dep_var)/sum(model_data$location_category=='pub_loc')))
+
+### calculate overall turnout for election
+turnout <- mean(model_data[[dep_var]], na.rm=T)
+
