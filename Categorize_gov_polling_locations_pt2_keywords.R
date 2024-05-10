@@ -243,7 +243,7 @@ polltest<-polltest%>%
 
 
 #calc missingness by checking which addresses are in structure list
-#sum(is.na(polltest$location_category))/9156 #9.4% missing
+#sum(is.na(polltest$location_category))/9156 #9.64% missing
 
 ####### save to csv
 #set directory
