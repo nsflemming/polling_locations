@@ -79,10 +79,13 @@ educ_to_ord <- function(data, educ_var, mapping){
 ################################################################# Main
 
 # set directories
-data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places\\data'
-L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places\\data\\VM2_PA_2019_08_23'
+data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
+## adjust as needed based on year desired
+L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2__PA__2020_10_01'
+
 # Set variable lists
-vote_vars<-c('LALVOTERID', 'General_2018_11_06','General_2017_11_07')
+## adjust as needed based on elections of interest
+vote_vars<-c('LALVOTERID', 'General_2018_11_06','General_2019_11_05')
 demog_vars<-c('LALVOTERID', 
               #address/location
               'Residence_Addresses_AddressLine',
@@ -105,42 +108,45 @@ demog_vars<-c('LALVOTERID',
               )
 
 # Read in data
-L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-VOTEHISTORY.tab', vote_vars)
-L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-VOTEHISTORY.tab', vote_vars)
+L2demog<-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-DEMOGRAPHIC.tab', demog_vars)
 ## race estimates
-setwd(L2_dir)
+setwd(data_dir)
 #load('PA_2016_race.Rdata')
 #race16<-df.pred
-race17<-read.csv('pa2017.csv')
+#race17<-read.csv('pa2017.csv')
 race18<-read.csv('pa2018.csv')
+race19<-read.csv('pa2019.csv')
 #rm(df.pred)
 ## Add year to predicted race
-race17<-race17%>%
-  rename(pred.whi_2017 = pred.whi,
-         pred.bla_2017 = pred.bla,
-         pred.his_2017 = pred.his,
-         pred.asi_2017 = pred.asi,
-         pred.oth_2017 = pred.oth)
 race18<-race18%>%
   rename(pred.whi_2018 = pred.whi,
          pred.bla_2018 = pred.bla,
          pred.his_2018 = pred.his,
          pred.asi_2018 = pred.asi,
          pred.oth_2018 = pred.oth)
+race19<-race19%>%
+  rename(pred.whi_2019 = pred.whi,
+         pred.bla_2019 = pred.bla,
+         pred.his_2019 = pred.his,
+         pred.asi_2019 = pred.asi,
+         pred.oth_2019 = pred.oth)
 # Combine L2 data
 L2demog<-left_join(L2demog, L2votehist, by = 'LALVOTERID')
 ## merge in race estimates
 #L2demog<-left_join(L2demog, race16, by='LALVOTERID')
-L2demog<-left_join(L2demog, race17, by='LALVOTERID')
+#L2demog<-left_join(L2demog, race17, by='LALVOTERID')
 L2demog<-left_join(L2demog, race18, by='LALVOTERID')
+L2demog<-left_join(L2demog, race19, by='LALVOTERID')
 ### drop voterhistory
 rm(L2votehist)
 ### drop race imputations
 rm(race18)
+rm(race19)
 
 ################# merge L2 data with polling location data
 # Read in location/category data
-poll <- get_poll_data(data_dir, 'poll_struct_key_govsource18.csv', 
+poll <- get_poll_data(data_dir, 'poll_struct_key_govsource19.csv', 
                       c('CountyName', 'PrecinctName', 'location_category'))
 ## rename variables to match L2
 poll<-poll%>%
@@ -232,8 +238,8 @@ L2demog$known_repub <- ifelse(L2demog$Parties_Description=="Republican",TRUE,FAL
 
 ################# write to csv
 setwd(data_dir)
-write.csv(L2demog, 'L2PA_full.csv')
+write.csv(L2demog, 'L2PA_full_18_19.csv')
 
-#mini_data <- L2demog[sample(nrow(L2demog), 100000),]
+mini_data <- L2demog[sample(nrow(L2demog), 100000),]
 
 
