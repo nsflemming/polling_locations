@@ -23,12 +23,12 @@ results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 # read in data
 setwd(data_dir)
-model_data<-read.csv('L2PA_full.csv')
+model_data<-read.csv('L2PA_full_VM2_19.csv')
 
 ### variable modifications
 # Convert vote to binary
 model_data <- binarize_vote(model_data, 'General_2018_11_06', 'Y')
-model_data <- binarize_vote(model_data, 'General_2017_11_07', 'Y')
+model_data <- binarize_vote(model_data, 'General_2019_11_05', 'Y')
 
 test_data<-sample_n(model_data, 10000)
 
