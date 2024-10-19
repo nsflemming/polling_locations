@@ -50,9 +50,9 @@ We ran the code below changing the years to be 2017, 2018, 2019, and 2020 each t
 ```{bash,eval=F,echo=T}
 #Start in directory with zipped folders of FVE files, run for each year 2017 to 2020 (2020 shown here)
 
-touch FVEData/pa2019.txt FVEData/hist2019.txt #create blank .txt files
+touch FVEData/pa2017.txt FVEData/hist2017.txt #create blank .txt files
 
-for z in *2019*.zip #cycle zip files that include 2020
+for z in *2017*.zip #cycle zip files that include 2020
 do
 	rm -r TempWork #clear TempWork if there's anything there
 	mkdir TempWork #create TempWork to store intermediary steps
@@ -65,20 +65,20 @@ do
 		do
 			#echo "$f" #uncomment to print file name in terminal
 			#add columns 1,3 to 9, 12, 27,28, 70 to 150 and 152 to hist2020.txt
-			cat "$f" | cut -d$'\t' -f1,3-9,12-12,27-28,70-150,152    >> ../../FVEData/hist2019.txt
+			cat "$f" | cut -d$'\t' -f1,3-9,12-12,27-28,70-150,152    >> ../../FVEData/hist2017.txt
 			#add columns 1,3 to 10, 12 to 20, 23,25 to 29, and 152 to pa2020.txt
-			cat "$f" | cut -d$'\t' -f1,3-10,12-20,23-23,25-29,152  >> ../../FVEData/pa2019.txt
+			cat "$f" | cut -d$'\t' -f1,3-10,12-20,23-23,25-29,152  >> ../../FVEData/pa2017.txt
 		done
 	done
 	cd ..//..// #go back to original folder
 done
 #get matching headers and combine to final files. 
-cat headernames.txt| cut -d$'\t' -f1,3-10,12-20,27-28,70-150,152 > FVEData/voterhistory2019.txt
-cat FVEData/hist2019.txt>> FVEData/voterhistory2019.txt
-cat headernames.txt| cut -d$'\t' -f1,3-10,12-20,23-23,25-29,152 > FVEData/voterdata2019.txt
-cat FVEData/pa2019.txt>> FVEData/voterdata2019.txt
+cat headernames.txt| cut -d$'\t' -f1,3-10,12-20,27-28,70-150,152 > FVEData/voterhistory2017.txt
+cat FVEData/hist2017.txt>> FVEData/voterhistory2017.txt
+cat headernames.txt| cut -d$'\t' -f1,3-10,12-20,23-23,25-29,152 > FVEData/voterdata2017.txt
+cat FVEData/pa2017.txt>> FVEData/voterdata2017.txt
 #clean up unnecessary files
-rm FVEData/hist2019.txt FVEData/pa2019.txt
+rm FVEData/hist2017.txt FVEData/pa2017.txt
 rm -r TempWork
 ```
 
