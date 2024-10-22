@@ -1,6 +1,6 @@
 #Nathaniel Flemming
 #18/10/24
-#18/10/24
+#19/10/24
 
 library(tidyverse)
 library(data.table) #read in L2 data selectively
@@ -106,11 +106,15 @@ L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2__PA__2020_10
 
 # Set variable lists
 ## adjust as needed based on elections of interest
-vote_vars<-c('LALVOTERID','County','Voters_FIPS','Precinct','General_2016_11_08','General_2017_11_07',
+vote_vars<-c('LALVOTERID','General_2016_11_08','General_2017_11_07',
              'General_2018_11_06','General_2019_11_05')
+demog_vars<-c('LALVOTERID','County','Voters_FIPS','Precinct')
 
 # Read in data
 L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-VOTEHISTORY.tab', vote_vars)
+L2demog<-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-DEMOGRAPHIC.tab', demog_vars)
+# Combine L2 data
+L2votehist<-left_join(L2votehist, L2demog, by = 'LALVOTERID')
 
 ################# merge L2 data with polling location data
 # Read in location/category data
@@ -143,65 +147,9 @@ rm(poll)
 ##### Drop extraneous variables
 #L2votehist <- subset(L2votehist, select = -c(X, index))
 
-####################### Process L2 data to more usable forms
-# Convert income to numeric
-L2votehist<-dollar_to_num(L2votehist, 'CommercialData_EstimatedHHIncomeAmount')
-# Convert education to ordinal
-## level to numeric map
-educ_map <- c("Less than HS Diploma - Ex Like"=1,
-              "Less than HS Diploma - Likely"=1,
-              'HS Diploma - Extremely Likely'=2, "HS Diploma - Likely"=2,
-              "Some College -Extremely Likely"=3, "Some College - Likely"=3, 
-              "Vocational Technical Degree - Extremely Likely"=4,
-              "Bach Degree - Extremely Likely"=5, "Bach Degree - Likely"=5,
-              "Grad Degree - Extremely Likely"=6, "Grad Degree - Likely"=6
-)
-L2votehist<-educ_to_ord(L2votehist, 'CommercialData_Education', educ_map)
-## Create factor variables
-# Convert location category to factor
-L2votehist$location_category <- as.factor(L2votehist$location_category)
-# Convert parties to factor
-L2votehist$Parties_Description <- as.factor(L2votehist$Parties_Description)
-# Replace blanks with 'no' for union membership
-L2votehist$CommercialData_LikelyUnion[L2votehist$CommercialData_LikelyUnion==''] <- 'No'
-## factor
-L2votehist$CommercialData_LikelyUnion<-as.factor(L2votehist$CommercialData_LikelyUnion)
-# Replace blank with 'unknown' for occupation industry
-L2votehist$CommercialData_OccupationIndustry[L2votehist$CommercialData_OccupationIndustry==''] <- 'Unknown'
-## factor
-L2votehist$CommercialData_OccupationIndustry<-as.factor(L2votehist$CommercialData_OccupationIndustry)
-# Replace blank with 'unknown' for occupation group
-L2votehist$CommercialData_OccupationGroup[L2votehist$CommercialData_OccupationGroup==''] <- 'Unknown'
-## factor
-L2votehist$CommercialData_OccupationGroup<-as.factor(L2votehist$CommercialData_OccupationGroup)
-
-## Create Binary Variables
-# Convert household composition to child yes/no
-L2votehist$has_child <- str_detect(L2votehist$CommercialData_HHComposition, 'Children|children')
-# Convert religious description to know religious yes/no, set blank to no
-L2votehist$known_religious <- L2votehist$Religions_Description!=""
-# Convert gender to M/F, set blank to missing
-L2votehist$Voters_Gender <- ifelse(L2votehist$Voters_Gender=="",NA,L2votehist$Voters_Gender)
-## Create Location dummy variables
-L2votehist$pub_loc<-L2votehist$location_category=='public'
-L2votehist$pub_just <- L2votehist$location_category=='public_justice'
-L2votehist$other<-L2votehist$location_category=='other'
-L2votehist$relig_loc <- (L2votehist$location_category=='religious'|L2votehist$location_category=='religious_school')
-L2votehist$school <- L2votehist$location_category=='school' 
-L2votehist$multiple <- L2votehist$location_category=='multiple'
-L2votehist$justice_loc <- (L2votehist$location_category=='justice'|L2votehist$location_category=='public_justice')
-L2votehist$library<-L2votehist$location_category=='library'
-L2votehist$relig_school <- L2votehist$location_category=='religious_school' 
-
-### Create known government employee dummy variable
-L2votehist$known_gov_emp <- ifelse(L2votehist$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
-### Create known Republican dummy variable
-L2votehist$known_repub <- ifelse(L2votehist$Parties_Description=="Republican",TRUE,FALSE)
-
-
 ################# write to csv
 setwd(data_dir)
-write.csv(L2votehist, '')
+write.csv(L2votehist, 'L2PA_votehist_VM2_20.csv')
 
 #mini_data <- L2votehist[sample(nrow(L2votehist), 100000),]
 
