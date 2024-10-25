@@ -46,21 +46,21 @@ plot_data<-model_data%>%
            ever_moved_new_precinct))
 
 # split data by group (treatment vs. control)
-pd_t<-plot_data[plot_data$ever_no_move_new_precinct==1,]
-pd_c<-plot_data[plot_data$ever_no_move_new_precinct==0,]
+pd_t<-plot_data[plot_data$ever_changed_precinct==1,]
+pd_c<-plot_data[plot_data$ever_changed_precinct==0,]
 ## calculate turnout for each group 
 pd_t$turnout[pd_t$year==-1]<-sum(pd_t$General_2016_11_08, na.rm = T)/nrow(pd_t)
 pd_t$turnout[pd_t$year==0]<-sum(pd_t$General_2017_11_07, na.rm = T)/nrow(pd_t)
 pd_t$turnout[pd_t$year==1]<-sum(pd_t$General_2018_11_06, na.rm = T)/nrow(pd_t)
 pd_t<-pd_t%>%
-  select(c(year,turnout,ever_no_move_new_precinct))%>%
+  select(c(year,turnout,ever_changed_precinct))%>%
   distinct()
 
 pd_c$turnout[pd_c$year==-1]<-sum(pd_c$General_2016_11_08, na.rm = T)/nrow(pd_c)
 pd_c$turnout[pd_c$year==0]<-sum(pd_c$General_2017_11_07, na.rm = T)/nrow(pd_c)
 pd_c$turnout[pd_c$year==1]<-sum(pd_c$General_2018_11_06, na.rm = T)/nrow(pd_c)
 pd_c<-pd_c%>%
-  select(c(year,turnout,ever_no_move_new_precinct))%>%
+  select(c(year,turnout,ever_changed_precinct))%>%
   distinct()
 pd_c<-pd_c[complete.cases(pd_c),]
 
@@ -68,23 +68,21 @@ pd_c<-pd_c[complete.cases(pd_c),]
 pd<-rbind(pd_t,pd_c)
 
 # factor treatment variables for plotting
-pd$ever_no_move_new_precinct<-factor(pd$ever_no_move_new_precinct)
+pd$ever_changed_precinct<-factor(pd$ever_changed_precinct)
 
-ggplot(pd,aes(x=year,y=turnout,colour=ever_no_move_new_precinct)) +
+ggplot(pd,aes(x=year,y=turnout,colour=ever_changed_precinct)) +
   geom_point()+
-  geom_line(aes(group = ever_no_move_new_precinct), linetype = 2)+
+  geom_line(aes(group = ever_changed_precinct), linetype = 2)+
   ylab("% Turnout") +
   xlab("Year") +
   ggtitle("Parallel Trends Plot") +
   scale_x_continuous(breaks=seq(-1,1,1))+
   #convert turnout to percentage
   scale_y_continuous(labels = scales::percent)+
-  scale_color_discrete(name="Changed Precinct Without Moving",
+  scale_color_discrete(name="Changed Precinct",
                         breaks=c(0, 1),
                         labels=c("No", "Yes"))+
   theme_minimal()
-
-
 
 
 
