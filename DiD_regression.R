@@ -41,6 +41,14 @@ model_data$changed_prec<-as.numeric(model_data$changed_prec)
 model_data$no_move_new_precinct<-as.numeric(model_data$no_move_new_precinct)
 model_data$moved_new_precinct<-as.numeric(model_data$moved_new_precinct)
 
+#2 period data set (2017 and 18)
+two_data<-model_data%>%
+  filter(complete.cases(.))%>%
+  filter(year!=2016)%>%
+  group_by(LALVOTERID)%>%
+  filter(n()>1)%>%
+  ungroup()
+
 #3 period data set
 three_data<-model_data%>%
   filter(complete.cases(.))%>%
@@ -50,9 +58,23 @@ three_data<-model_data%>%
 
 
 # testing data sets
-mini_data<-three_data[1:500000,]
+mini_data<-two_data[1:500000,]
 
-test_data<-three_data%>%
+two_data<-two_data%>%
+  # group by voter
+  group_by(LALVOTERID)%>%
+  mutate(ever_changed_precinct=sum(changed_prec),
+         ever_no_move_new_precinct=sum(no_move_new_precinct),
+         ever_moved_new_precinct=sum(moved_new_precinct))
+
+%>%
+  # group into voter-years
+  # set first treated year to year if treated is true
+  group_by(year)%>%
+  mutate(first_treated=ifelse(no_move_new_precinct==1, year, 0))%>%
+  ungroup()
+
+three_data<-three_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
   mutate(ever_changed_precinct=sum(changed_prec),
@@ -84,7 +106,6 @@ test_data<-three_data%>%
 # test with fake outcome variable (works)
 #test$outcome<-rnorm(nrow(test))
 
-
 test<-mini_data%>%
   ungroup()%>%
   select(c(VOTERID,year,first_treated,voted,Voters_Gender,
@@ -103,7 +124,7 @@ test<-mini_data%>%
 model<-glm(General_2018_11_06~ever_no_move_new_precinct*year+Voters_Gender+Voters_Age
            +CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount
            +known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry,
-           data = mini_data, family = 'binomial')
+           data = two_data, family = 'binomial')
 summary(model)
 
 
