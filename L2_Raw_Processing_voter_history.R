@@ -8,7 +8,7 @@ library(stringr) #string manipulation
 library(fuzzyjoin) #fuzzy match precinct names
 library(stringdist) #fuzzy match precinct names
 
-########## Create voter history files from L2 data
+########## Create voter history files from L2 data and combined voter and poll location files from Combine_voterfile_pollocation
 
 ########## Functions
 
@@ -104,11 +104,14 @@ race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_r
 ## adjust as needed based on year desired
 L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2__PA__2020_10_01'
 
+#set polling location data year
+poll_year=2020
+
 # Set variable lists
 ## adjust as needed based on elections of interest
 vote_vars<-c('LALVOTERID','General_2016_11_08','General_2017_11_07',
              'General_2018_11_06','General_2019_11_05')
-demog_vars<-c('LALVOTERID','County','Voters_FIPS','Precinct')
+demog_vars<-c('LALVOTERID','Voters_StateVoterID','County','Voters_FIPS','Precinct')
 
 # Read in data
 L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-VOTEHISTORY.tab', vote_vars)
@@ -118,19 +121,43 @@ L2votehist<-left_join(L2votehist, L2demog, by = 'LALVOTERID')
 
 ################# merge L2 data with polling location data
 # Read in location/category data
-poll <- get_poll_data(data_dir, 'poll_struct_key_govsource19.csv', 
-                      c('CountyName', 'PrecinctName', 'location_category'))
-## rename variables to match L2
-poll<-poll%>%
-  rename('County'='CountyName')
+poll <- get_poll_data(data_dir, paste0('FVE_',poll_year,'_polllocation.csv'), 
+                      c('VOTERID','County', 'PrecinctName', 'location_category'))
 ### Replace '-' in L2 precinct names to better match government format
 L2votehist<-L2votehist%>%
   mutate(across('Precinct', str_replace, '-', ' '))#deprecated syntax?
-### Convert government county names to all caps to match L2
-poll$County<-toupper(poll$County)
 
-## Create a crosswalk by fuzzy matching precinct names (replace with something more official)
-### match on voterid instead?
+## merge on state voter id
+test<-left_join(L2votehist, poll, by=c('County','Voters_StateVoterID'='VOTERID'))
+sum(is.na(test$PrecinctName))
+# missing 695,180 location categories, about 74,000 more than missing from poll 
+# missing 124,313 poll location data rows, 1.5% missing
+
+
+### examine missing
+notinL2<-poll[!(poll$VOTERID%in%L2votehist$Voters_StateVoterID),]
+notinpoll<-L2votehist[!(L2votehist$Voters_StateVoterID%in%poll$VOTERID),]
+
+
+
+voterid<-L2votehist$Voters_StateVoterID[L2votehist$County=='ADAMS']
+pollid<-poll$VOTERID[poll$County=='ADAMS']
+sum(pollid%in%voterid)
+
+notin<-pollid[!(pollid%in%voterid)]
+notinp<-voterid[!(voterid%in%pollid)]
+
+notin<-poll[!(poll$VOTERID%in%L2votehist$Voters_StateVoterID),]
+notin<-str_sub(notin$VOTERID, 2)
+sum(notin%in%L2votehist$Voters_StateVoterID)
+
+voterid<-as.integer(substring(voterid, 6))
+voterid=sort(voterid)
+# remove 5 leading characters? so length matches L2 ids? 
+pollid<-str_sub(pollid, 3)
+sum(pollid%in%voterid)
+pollid=sort(pollid)
+
 crosswalk<-fuzzy_match_precincts(L2votehist, poll)
 ####### Double check inexact matches
 # rename columns to match other data sets
