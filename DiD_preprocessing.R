@@ -23,10 +23,24 @@ binarize_vote <- function(data, vote_var, yes_vote_value){
 data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
 results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
-# read in data
+# read in vote history and poll location data
 setwd(data_dir)
-data_2020<-read.csv('L2PA_votehist_VM2_19.csv')
+hist_poll_2019<-read.csv('L2PA_votehist_VM2_19.csv')
+hist_poll_2020<-read.csv('L2PA_votehist_VM2_20.csv')
 #data_2019<-read.csv('L2PA_full_VM2_19.csv')
+
+### read in voter demographic and address data
+demog_addr_2016<-read.csv('L2PA_2016_address_in_16.csv')
+demog_addr_2017<-read.csv('L2PA_2017_address_in_17.csv')
+demog_addr_2018<-read.csv('L2PA_2018_address_in_18.csv')
+## add year indicator
+demog_addr_2016$year<-2016
+demog_addr_2017$year<-2017
+demog_addr_2018$year<-2018
+## remove county and precinct columns since that's in the voter history/polling location files
+
+
+### merge demographic and address data with voting history and polling location data
 
 # combine 2017 and 2018 addresses with 2019 (2020 file) vote data
 ## trim 2019 data to just voter data
