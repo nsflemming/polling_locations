@@ -1,6 +1,6 @@
 #Nathaniel Flemming
 # 27/9/24
-#19/10/24
+#20/11/24
 
 # Preprocessing data for the difference in difference regressions
 ## uses data files made by L2_Raw_Processing scripts
@@ -25,16 +25,16 @@ results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 # read in data
 setwd(data_dir)
-data_2020<-read.csv('L2PA_votehist_VM2_20.csv')
+data_2020<-read.csv('L2PA_votehist_VM2_19.csv')
 #data_2019<-read.csv('L2PA_full_VM2_19.csv')
 
 # combine 2017 and 2018 addresses with 2019 (2020 file) vote data
 ## trim 2019 data to just voter data
-data_2020_trim<-data_2020%>%
-  select(LALVOTERID, General_2016_11_08, General_2017_11_07, General_2018_11_06, 
-         General_2019_11_05)
+#data_2020_trim<-data_2020%>%
+#  select(LALVOTERID, General_2016_11_08, General_2017_11_07, General_2018_11_06, 
+#         General_2019_11_05)
 # free up memory
-rm(data_2020)
+#rm(data_2020)
 
 ## find duplicates
 # duplicates17 <- data_2017 %>%
@@ -43,18 +43,18 @@ rm(data_2020)
 #   ungroup()
 
 ### read in voter data years
-data_2018<-read.csv('L2PA_2018_address_in_18.csv')
-data_2017<-read.csv('L2PA_2017_address_in_17.csv')
 data_2016<-read.csv('L2PA_2016_address_in_16.csv')
+data_2017<-read.csv('L2PA_2017_address_in_17.csv')
+data_2018<-read.csv('L2PA_2018_address_in_18.csv')
 ## add year indicator
 data_2016$year<-2016
 data_2017$year<-2017
 data_2018$year<-2018
 
 ## merge data each year of locations with voting indicator
-merged_20_16<-left_join(data_2020_trim, data_2016, by='LALVOTERID')
-merged_20_17<-left_join(data_2020_trim, data_2017, by='LALVOTERID')
-merged_20_18<-left_join(data_2020_trim, data_2018, by='LALVOTERID')
+merged_20_16<-left_join(data_2020, data_2016, by='LALVOTERID')
+merged_20_17<-left_join(data_2020, data_2017, by='LALVOTERID')
+merged_20_18<-left_join(data_2020, data_2018, by='LALVOTERID')
 
 # free up memory
 rm(data_2016)
