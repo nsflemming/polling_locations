@@ -105,21 +105,22 @@ race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_r
 L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
 
 #set polling location data year
-poll_year=2019
+poll_year=2018
 
 # Set variable lists
 ## adjust as needed based on elections of interest
 #vote_vars<-c('LALVOTERID','General_2016_11_08','General_2017_11_07',
 #             'General_2018_11_06','General_2019_11_05')
-vote_vars<-c('LALVOTERID','General_2016_11_08','General_2017_11_07',
-             'General_2018_11_06')
+#vote_vars<-c('LALVOTERID','General_2016_11_08','General_2017_11_07',
+#             'General_2018_11_06')
 demog_vars<-c('LALVOTERID','Voters_StateVoterID','County','Voters_FIPS','Precinct')
 
 # Read in data
-L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-VOTEHISTORY.tab', vote_vars)
-L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+#L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-VOTEHISTORY.tab', vote_vars)
+#L2demog<-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-DEMOGRAPHIC.tab', demog_vars)
 # Combine L2 data
-L2votehist<-left_join(L2votehist, L2demog, by = 'LALVOTERID')
+#L2votehist<-left_join(L2votehist, L2demog, by = 'LALVOTERID')
+L2votehist<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
 
 ################# merge L2 data with polling location data
 # Read in location/category data
@@ -135,6 +136,7 @@ sum(is.na(merged$PrecinctName))
 # missing 695,180 location categories, about 74,000 more than missing from poll 
 # 2020 missing 124,313 poll location data rows, 1.5% missing
 # 2019 missing 139,617 poll location data rows, 1.8% missing
+# 2018 missing 10,163 poll location data rows, 0.1% missing
 
 # 
 # ### examine missing
@@ -167,6 +169,5 @@ sum(is.na(merged$PrecinctName))
 setwd(data_dir)
 write.csv(merged, 'L2PA_votehist_VM2_19.csv')
 
-#mini_data <- L2votehist[sample(nrow(L2votehist), 100000),]
 
 
