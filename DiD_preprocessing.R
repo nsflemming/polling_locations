@@ -41,9 +41,9 @@ rm(hist_poll_2020)
 poll_2019<-read_add_year(data_dir, 'L2PA_votehist_VM2_19.csv',2019)
 poll_2018<-read_add_year(data_dir, 'L2PA_votehist_VM2_18.csv',2018)
 # bind different years of polling locations together
-poll_master<-rbind(poll_2019,poll_2018)
+#poll_master<-rbind(poll_2019,poll_2018)
 # remove data frames to free up memory
-rm(poll_2020, poll_2019, poll_2018)
+#rm(poll_2020, poll_2019, poll_2018)
 
 
 ### read in voter demographic and address data
@@ -59,54 +59,48 @@ rm(poll_2020, poll_2019, poll_2018)
 #   select(-c(County, Voters_FIPS, Precinct, PrecinctName))
 # poll_demog_addr_17<-left_join(poll_master, demog_addr_2017, by='LALVOTERID')
 # rm(demog_addr_2017)
-demog_addr_2018<-read_add_year(data_dir, 'L2PA_2018_address_in_18.csv', 2018)%>%
-  select(-c(County, Voters_FIPS, Precinct, PrecinctName))
+#demog_addr_2018<-read_add_year(data_dir, 'L2PA_2018_address_in_18.csv', 2018)%>%
+demog_addr_2018<-read.csv(paste0(data_dir,'\\L2PA_2018_address_in_18.csv'))%>%
+  select(-c(X, County, Voters_FIPS, Precinct, location_category))
 #poll_demog_addr<-left_join(poll_master, demog_addr_2018, by=c('LALVOTERID', 'year'))
 #rm(demog_addr_2018)
-demog_addr_2019<-read_add_year(data_dir, 'L2PA_2019_address_in_19.csv', 2019)
+#demog_addr_2019<-read_add_year(data_dir, 'L2PA_2019_address_in_19.csv', 2019)
+demog_addr_2019<-read.csv(paste0(data_dir,'\\L2PA_2019_address_in_19.csv'))%>%
+  select(-c(X, County, Voters_FIPS, Precinct,location_category))
 #poll_demog_addr<-left_join(poll_demog_addr, demog_addr_2019, by=c('LALVOTERID', 'year'))
 #rm(demog_addr_2019)
 
-#remove poll location data frame
-#rm(poll_master)
+#### Merge poll location data with voter demographic data on L2 voterid
+demog_addr_2018<-left_join(demog_addr_2018, poll_2018, by='LALVOTERID')
+demog_addr_2019<-left_join(demog_addr_2019, poll_2019, by='LALVOTERID')
+# remove data frames to free up memory
+rm(poll_2018, poll_2019)
 
-## rbind years together
-### make column names match (check that income variables are equivalent)
-# poll_demog_addr_16<-poll_demog_addr_16%>%
-#   rename(CommercialData_EstimatedHHIncomeAmount=CommercialData_EstimatedIncomeAmount,
-#          pred.whi=pred.whi_2016, pred.bla=pred.bla_2016, pred.his=pred.his_2016, 
-#          pred.asi=pred.asi_2016, pred.oth=pred.oth_2016)
-# poll_demog_addr_17<-poll_demog_addr_17%>%
-#   rename(CommercialData_EstimatedHHIncomeAmount=CommercialData_EstimatedIncomeAmount,
-#          pred.whi=pred.whi_2017, pred.bla=pred.bla_2017, pred.his=pred.his_2017, 
-#          pred.asi=pred.asi_2017, pred.oth=pred.oth_2017,
-#          pred_race=pred_race.y,
-#          pred_black=pred_black.y)%>%
-#   select(-c(pred.whi_2018, pred.bla_2018, pred.his_2018, pred.asi_2018, 
-#             pred.oth_2018, pred_race.x, pred_black.x))
-poll_demog_addr_18<-poll_demog_addr_18%>%
+#### rbind years together
+## make column names match (check that income variables are equivalent)
+demog_addr_2018<-demog_addr_2018%>%
   rename(pred.whi=pred.whi_2018, pred.bla=pred.bla_2018, pred.his=pred.his_2018, 
          pred.asi=pred.asi_2018, pred.oth=pred.oth_2018)
-poll_demog_addr_19<-poll_demog_addr_19%>%
+demog_addr_2019<-demog_addr_2019%>%
   rename(pred.whi=pred.whi_2019, pred.bla=pred.bla_2019, pred.his=pred.his_2019, 
          pred.asi=pred.asi_2019, pred.oth=pred.oth_2019)
-## rbind
-poll_demog_addr_all<-rbind(poll_demog_addr_18,poll_demog_addr_19)
+poll_demog_addr_all<-rbind(demog_addr_2018, demog_addr_2019)
+# remove data frames to free up memory
+rm(demog_addr_2018, demog_addr_2019)
 
-# Merge in polling locations
-merged_data<-left_join(poll_demog_addr_all, poll_master, by=c('LALVOTERID','year'))
-
-# Merge in voting history
-merged_data<-left_join(poll_demog_addr_all, hist_2020, by='LALVOTERID')
+#### Merge in voting history on L2 voterid
+vote_poll_demog_addr_all<-left_join(poll_demog_addr_all, hist_2020, by='LALVOTERID')
+# remove data frames to free up memory
+rm(hist_2020, poll_demog_addr_all)
 
 # Convert vote to binary
-merged_data <- binarize_vote(merged_data, 'General_2016_11_08', 'Y')
-merged_data <- binarize_vote(merged_data, 'General_2017_11_07', 'Y')
-merged_data <- binarize_vote(merged_data, 'General_2018_11_06', 'Y')
-merged_data <- binarize_vote(merged_data, 'General_2019_11_05', 'Y')
+vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2016_11_08', 'Y')
+vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2017_11_07', 'Y')
+vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2018_11_06', 'Y')
+vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2019_11_05', 'Y')
 
 # Create treatment indicators
-merged_data<-merged_data%>%
+vote_poll_demog_addr_all<-vote_poll_demog_addr_all%>%
   group_by(LALVOTERID)%>%
   mutate(
     ## set to TRUE when precinct doesn't match previous
@@ -133,11 +127,10 @@ merged_data<-merged_data%>%
     # didn't move, but precinct changed (should that be possible? double check when precincts change)
     no_move_new_precinct = (changed_address==FALSE & changed_prec==TRUE))%>%
   ungroup()
-# 'school' and other location dummies work as treatment variables for location effects
-
+# recreate location dummies for use as treatment variables for location effects
 
 # drop variables not in DiD Models
-merged_data<-select(merged_data, c(LALVOTERID, year,
+vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year,
                                    General_2016_11_08,General_2017_11_07,
                                    General_2018_11_06,General_2019_11_05,
                                    changed_address,changed_prec,moved_new_precinct,
@@ -149,99 +142,18 @@ merged_data<-select(merged_data, c(LALVOTERID, year,
                                    known_religious,CommercialData_LikelyUnion,
                                    CommercialData_OccupationIndustry))
 
-# save data
-write.csv(merged_data, 'DiD_prepped_loc_vote_16to18.csv')
-
-
-
-
-
-
-
-#merged_data<-read.csv('DiD_prepped_loc_vote_17_18.csv')
-merged_data <- merged_data[order(merged_data$LALVOTERID),]
-
-test_data<-merged_data[1:1000,]
-
-
-### merge demographic and address data with voting history and polling location data
-
-# combine 2017 and 2018 addresses with 2019 (2020 file) vote data
-## trim 2019 data to just voter data
-#data_2020_trim<-data_2020%>%
-#  select(LALVOTERID, General_2016_11_08, General_2017_11_07, General_2018_11_06, 
-#         General_2019_11_05)
-# free up memory
-#rm(data_2020)
-
-## find duplicates
-# duplicates17 <- data_2017 %>%
-#   group_by(LALVOTERID) %>%
-#   filter(n() > 1) %>%
-#   ungroup()
-
-
-
-
-
-# Convert vote to binary
-merged_data <- binarize_vote(merged_data, 'General_2016_11_08', 'Y')
-merged_data <- binarize_vote(merged_data, 'General_2017_11_07', 'Y')
-merged_data <- binarize_vote(merged_data, 'General_2018_11_06', 'Y')
-merged_data <- binarize_vote(merged_data, 'General_2019_11_05', 'Y')
-
-#merged_data<-read.csv('DiD_prepped_loc_vote_17_18.csv')
-merged_data <- merged_data[order(merged_data$LALVOTERID),]
-
-test_data<-merged_data[1:1000,]
-#test_data2<-test_data[5:6,]
-#unique(test_data2$Residence_Addresses_AddressLine)
-
-# Create treatment indicators
-merged_data<-merged_data%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    ## set to TRUE when precinct doesn't match previous
-    changed_prec = Precinct != lag(Precinct),
-    ## set to TRUE when address doesn't match previous
-    changed_address = Residence_Addresses_AddressLine != lag(Residence_Addresses_AddressLine),
-    ## Once treated, all subsequent values = treated
-    ### need extra step to avoid NAs in 2017
-    changed_prec = ifelse(is.na(lag(changed_prec)), changed_prec, 
-                          ifelse(lag(changed_prec), T, changed_prec)),
-    changed_address = ifelse(is.na(lag(changed_address)), changed_address, 
-                             ifelse(lag(changed_address), T, changed_address)))%>%
-  group_by(year)%>%
-  mutate(
-    ## set missing to FALSE
-    changed_prec = ifelse(is.na(changed_prec), F, changed_prec),
-    changed_address = ifelse(is.na(changed_address), F, changed_address))%>%
-  ungroup()%>%
-  # Create treatment indicators based on first indicators
-  group_by(LALVOTERID)%>%
-  mutate(
-    # moved & precinct changed
-    moved_new_precinct = (changed_address==TRUE & changed_prec==TRUE),
-    # didn't move, but precinct changed (should that be possible? double check when precincts change)
-    no_move_new_precinct = (changed_address==FALSE & changed_prec==TRUE))%>%
-  ungroup()
-# 'school' and other location dummies work as treatment variables for location effects
-
-
-# drop variables not in DiD Models
-merged_data<-select(merged_data, c(LALVOTERID, year,
-                                   General_2016_11_08,General_2017_11_07,
-                                   General_2018_11_06,General_2019_11_05,
-                                   changed_address,changed_prec,moved_new_precinct,
-                                   no_move_new_precinct,
-                                   poll_location,
-                                   Voters_Gender,Voters_Age,
-                                   CommercialData_EstimatedHHIncomeAmount,
-                                   Residence_Families_HHCount,
-                                   known_religious,CommercialData_LikelyUnion,
-                                   CommercialData_OccupationIndustry))
+# Modify variables to fit DiD package requirements
+## ID
+vote_poll_demog_addr_all$VOTERID<-str_sub(vote_poll_demog_addr_all$LALVOTERID, 
+                                          6, nchar(vote_poll_demog_addr_all$LALVOTERID))
+vote_poll_demog_addr_all$VOTERID<-as.numeric(vote_poll_demog_addr_all$VOTERID)
+# set years to 0 and 1
+#model_data$year<-model_data$year+2017
+## treatment
+vote_poll_demog_addr_all$changed_prec<-as.numeric(vote_poll_demog_addr_all$changed_prec)
+vote_poll_demog_addr_all$no_move_new_precinct<-as.numeric(vote_poll_demog_addr_all$no_move_new_precinct)
+vote_poll_demog_addr_all$moved_new_precinct<-as.numeric(vote_poll_demog_addr_all$moved_new_precinct)
 
 # save data
-write.csv(merged_data, 'DiD_prepped_loc_vote_16to18.csv')
-
+write.csv(vote_poll_demog_addr_all, 'DiD_prepped_loc_vote_18to19.csv')
 
