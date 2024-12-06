@@ -150,10 +150,12 @@ vote_poll_demog_addr_all$VOTERID<-as.numeric(vote_poll_demog_addr_all$VOTERID)
 # set years to 0 and 1
 #model_data$year<-model_data$year+2017
 ## treatment
+vote_poll_demog_addr_all$changed_address<-as.numeric(vote_poll_demog_addr_all$changed_address)
 vote_poll_demog_addr_all$changed_prec<-as.numeric(vote_poll_demog_addr_all$changed_prec)
 vote_poll_demog_addr_all$no_move_new_precinct<-as.numeric(vote_poll_demog_addr_all$no_move_new_precinct)
 vote_poll_demog_addr_all$moved_new_precinct<-as.numeric(vote_poll_demog_addr_all$moved_new_precinct)
 
 # save data
+setwd(data_dir)
 write.csv(vote_poll_demog_addr_all, 'DiD_prepped_loc_vote_18to19.csv')
 
