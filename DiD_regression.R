@@ -1,6 +1,5 @@
 #Nathaniel Flemming
 # 24/9/24
-# 24/10/24
 
 # Difference in difference regressions, using data created by DiD_preprocessing script
 
@@ -22,7 +21,7 @@ results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 # read in data
 setwd(data_dir)
-model_data<-read.csv('DiD_prepped_loc_vote_16to18.csv')
+model_data<-read.csv('DiD_prepped_loc_vote_18to19.csv')
 
 # subset data to only people with entries in both years
 # test_data<-model_data%>%
@@ -30,76 +29,89 @@ model_data<-read.csv('DiD_prepped_loc_vote_16to18.csv')
 #   filter(n() > 1) %>%
 #   ungroup()
 
-# Modify variables to fit DiD package requirements
-## ID
-model_data$VOTERID<-str_sub(model_data$LALVOTERID, 6, nchar(model_data$LALVOTERID))
-model_data$VOTERID<-as.numeric(model_data$VOTERID)
-# set years to 0 and 1
-#model_data$year<-model_data$year+2017
-## treatment
-model_data$changed_prec<-as.numeric(model_data$changed_prec)
-model_data$no_move_new_precinct<-as.numeric(model_data$no_move_new_precinct)
-model_data$moved_new_precinct<-as.numeric(model_data$moved_new_precinct)
-
-#2 period data set (2017 and 18)
+# #2 period data set (2017 and 18)
+# two_data<-model_data%>%
+#   filter(complete.cases(.))%>%
+#   filter(year!=2016)%>%
+#   group_by(LALVOTERID)%>%
+#   filter(n()>1)%>%
+#   ungroup()
 two_data<-model_data%>%
-  filter(complete.cases(.))%>%
-  filter(year!=2016)%>%
-  group_by(LALVOTERID)%>%
-  filter(n()>1)%>%
+  filter(complete.cases(.))%>% #remove rows with missing data
+  group_by(LALVOTERID)%>% 
+  filter(n()>1)%>% # remove voters with only one year
   ungroup()
+# create a time period version of year
+two_data$time_period<-two_data$year-2018
+
 
 #3 period data set
-three_data<-model_data%>%
-  filter(complete.cases(.))%>%
-  group_by(LALVOTERID)%>%
-  filter(n()>2)%>%
-  ungroup()
+# three_data<-model_data%>%
+#   filter(complete.cases(.))%>%
+#   group_by(LALVOTERID)%>%
+#   filter(n()>2)%>%
+#   ungroup()
 
 
-# testing data sets
-mini_data<-two_data[1:500000,]
-
+### create indicators for ever being treated
+#two_data<-two_data%>%
 two_data<-two_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
-  mutate(ever_changed_precinct=sum(changed_prec),
-         ever_no_move_new_precinct=sum(no_move_new_precinct),
-         ever_moved_new_precinct=sum(moved_new_precinct))
-
-%>%
-  # group into voter-years
-  # set first treated year to year if treated is true
+  mutate(ever_changed_precinct=sum(changed_prec), #300,838 cases (2%)
+         ever_no_move_new_precinct=sum(no_move_new_precinct), #367,478 cases (3%)
+         ever_moved_new_precinct=sum(moved_new_precinct))%>% #66,640 cases (0.5%)
+  #create single variable that indicates if someone voted
   group_by(year)%>%
-  mutate(first_treated=ifelse(no_move_new_precinct==1, year, 0))%>%
+  mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))%>%
   ungroup()
+  # # group into voter-years
+  # # create first year treated variable
+  #  group_by(year)%>%
+  # # # create yr changed
+  #  mutate(yr_changed_prec=ifelse(changed_prec==1, year, 0),
+  #         yr_no_move_new_precinct=ifelse(no_move_new_precinct==1, year, 0),
+  #         yr_moved_new_precinct=ifelse(moved_new_precinct==1, year, 0))%>%
+  # # # ungroup back to voter
+  # ungroup()%>%
+  # group_by(LALVOTERID)%>%
+  # # create first year treated by taking lowest non-zero value of year treated
+  # mutate(FT_changed_prec = min(yr_changed_prec[yr_changed_prec>0]),
+  #        FT_no_move_new_precinct = min(no_move_new_precinct[no_move_new_precinct>0]),
+  #        FT_moved_new_precinct = min(moved_new_precinct[moved_new_precinct>0]))
 
-three_data<-three_data%>%
-  # group by voter
-  group_by(LALVOTERID)%>%
-  mutate(ever_changed_precinct=sum(changed_prec),
-         ever_no_move_new_precinct=sum(no_move_new_precinct),
-         ever_moved_new_precinct=sum(moved_new_precinct))%>%
-  # group into voter-years
-  # set first treated year to year if treated is true
-  group_by(year)%>%
-  mutate(first_treated=ifelse(no_move_new_precinct==1, year, 0))%>%
-  ungroup()%>%
-  # set first treated year to minimum year that's not 0 for all voter's rows
-  ## if all zero, keep 0
-  group_by(LALVOTERID)%>%
-  mutate(first_treated=ifelse(length(first_treated[first_treated>0])>0,
-           min(first_treated[first_treated>0]), 0))%>%
-  # Add outcome variable of voting in each year
-  # group by voter-year
-  group_by(LALVOTERID, year)%>%
-  mutate(voted=case_when(
-    ((General_2016_11_08==1) & (year==2016)) ~ 1,
-    ((General_2017_11_07==1) & (year==2017)) ~ 1,
-    ((General_2018_11_06==1) & (year==2018)) ~ 1,
-    .default = 0 # Default value if none of previous conditional holds
-  ))%>%
-  ungroup()
+# three_data<-three_data%>%
+#   # group by voter
+#   group_by(LALVOTERID)%>%
+#   mutate(ever_changed_precinct=sum(changed_prec),
+#          ever_no_move_new_precinct=sum(no_move_new_precinct),
+#          ever_moved_new_precinct=sum(moved_new_precinct))%>%
+#   # group into voter-years
+#   # set first treated year to year if treated is true
+#   group_by(year)%>%
+#   mutate(first_treated=ifelse(no_move_new_precinct==1, year, 0))%>%
+#   ungroup()%>%
+#   # set first treated year to minimum year that's not 0 for all voter's rows
+#   ## if all zero, keep 0
+#   group_by(LALVOTERID)%>%
+#   mutate(first_treated=ifelse(length(first_treated[first_treated>0])>0,
+#            min(first_treated[first_treated>0]), 0))%>%
+#   # Add outcome variable of voting in each year
+#   # group by voter-year
+#   group_by(LALVOTERID, year)%>%
+#   mutate(voted=case_when(
+#     ((General_2016_11_08==1) & (year==2016)) ~ 1,
+#     ((General_2017_11_07==1) & (year==2017)) ~ 1,
+#     ((General_2018_11_06==1) & (year==2018)) ~ 1,
+#     ((General_2019_11_05==1) & (year==2019)) ~ 1,
+#     .default = 0 # Default value if none of previous conditional holds
+#   ))%>%
+#   ungroup()
+
+############ testing data
+## order by voterid
+two_data <- two_data[order(two_data$VOTERID),]
+mini_data<-two_data[1:1000000,]
 
 #convert to integer to match year?
 #test$first_treated<-as.integer(test$first_treated)
@@ -121,25 +133,54 @@ test<-mini_data%>%
 ## compare change in probability of voting for people who changed precinct and people who didn't
 
 ###### Fixed effects regression framework, 2 periods, glm
-model<-glm(General_2018_11_06~ever_no_move_new_precinct*year+Voters_Gender+Voters_Age
+### NOTE: some covariates switch year to year probably shouldn't (like gender), likely error
+c_pre<-mean(two_data$General_2018_11_06[(two_data$ever_changed_precinct==0 & two_data$time_period==0)])
+c_post<-mean(two_data$General_2019_11_05[(two_data$ever_changed_precinct==0 & two_data$time_period==1)])
+t_pre<-mean(two_data$General_2018_11_06[two_data$ever_changed_precinct==1 & two_data$time_period==0])
+t_post<-mean(two_data$General_2019_11_05[two_data$ever_changed_precinct==1 & two_data$time_period==1])
+
+difference_treated = t_post - t_pre #diff in trtment grp
+difference_control = c_post - c_pre #diff in control grp
+difference_in_differences = difference_treated  - difference_control
+difference_in_differences #0.002115474
+
+mini_model<-glm(voted~ever_moved_new_precinct*year,
+           data = two_data, family = 'binomial')
+summary(mini_model)
+# save model summary
+setwd(results_dir)
+sink("move_changed_prec_2WFE_mini_model_summary.txt")
+print(summary(mini_model))
+sink()
+
+#
+model<-glm(General_2019_11_05~ever_changed_precinct*time_period #interaction of being and treatment group and pre/post
+           +Voters_Gender+Voters_Age
            +CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount
            +known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry,
            data = two_data, family = 'binomial')
 summary(model)
-
-
-
+# save model summary
+setwd(results_dir)
+sink("changed_prec_2WFE_model_summary.txt")
+print(summary(model))
+sink()
 
 # ######## Estimating Group-Time Average Treatment Effect, 2-periods
-# out0 <- drdid(yname = "General_2018_11_06", #outcome
-#               dname = "ever_no_move_new_precinct", #treatment
-#               idname = "VOTERID", #respondent
-#               tname = "year",
-#               xformla = ~Voters_Gender,
-#               data = mini_data)
-# 
-# out0 #
-#ggdid(out0)
+#covariates, must be time invariant
+### setting covariates to value at second time point
+two_data<-two_data%>%
+  group_by(VOTERID)%>%
+  mutate(Voters_Gender = Voters_Gender[2])
+
+out0 <- drdid(yname = "General_2019_11_05", #outcome
+              dname = "FT_changed_prec", #treatment
+              idname = "VOTERID", #respondent
+              tname = "year",
+              xformla = ~Voters_Gender, 
+              data = two_data)
+out0 #
+
 
 # Estimating Group-Time Average Treatment Effects,3+ periods
 ## issue with outcome variable
