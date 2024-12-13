@@ -9,7 +9,18 @@ library(tidyverse) #convenience
 library(data.table) #read in data selectively
 library(stringr) #id string manipulation
 
-
+# Load data in long format that comes in the DRDID package
+data(nsw_long)
+# Form the Lalonde sample with CPS comparison group
+eval_lalonde_cps <- subset(nsw_long, nsw_long$treated == 0 | nsw_long$sample == 2)
+drdidex <- drdid(yname = "re",
+             tname = "year", 
+             idname = "id", 
+             dname = "experimental", 
+             xformla= ~ age + educ + black + married + nodegree + hisp + re74, 
+             data = eval_lalonde_cps, 
+             panel = TRUE) 
+summary(drdidex)
 ########## Functions
 
 
@@ -61,24 +72,24 @@ two_data<-two_data%>%
   mutate(ever_changed_precinct=sum(changed_prec), #300,838 cases (2%)
          ever_no_move_new_precinct=sum(no_move_new_precinct), #367,478 cases (3%)
          ever_moved_new_precinct=sum(moved_new_precinct))%>% #66,640 cases (0.5%)
-  #create single variable that indicates if someone voted
+  #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
   mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))%>%
+  #ungroup()
+  # group into voter-years
+  # create first year treated variable
+  # group_by(year)%>%
+  # # create year changed precinct variable
+  mutate(yr_changed_prec=ifelse(changed_prec==1, year, 0),
+         yr_no_move_new_precinct=ifelse(no_move_new_precinct==1, year, 0),
+         yr_moved_new_precinct=ifelse(moved_new_precinct==1, year, 0))%>%
+  # ungroup back to voter
   ungroup()
-  # # group into voter-years
-  # # create first year treated variable
-  #  group_by(year)%>%
-  # # # create yr changed
-  #  mutate(yr_changed_prec=ifelse(changed_prec==1, year, 0),
-  #         yr_no_move_new_precinct=ifelse(no_move_new_precinct==1, year, 0),
-  #         yr_moved_new_precinct=ifelse(moved_new_precinct==1, year, 0))%>%
-  # # # ungroup back to voter
-  # ungroup()%>%
   # group_by(LALVOTERID)%>%
-  # # create first year treated by taking lowest non-zero value of year treated
-  # mutate(FT_changed_prec = min(yr_changed_prec[yr_changed_prec>0]),
-  #        FT_no_move_new_precinct = min(no_move_new_precinct[no_move_new_precinct>0]),
-  #        FT_moved_new_precinct = min(moved_new_precinct[moved_new_precinct>0]))
+  # # create first year treated by lowest year for which treatment indicator is 1, else 0
+  # mutate(FT_changed_prec = ifelse(1%in%changed_prec, min(year[changed_prec==1]),0),
+  #        FT_no_move_new_precinct = ifelse(1%in%no_move_new_precinct, min(year[no_move_new_precinct==1]),0),
+  #        FT_moved_new_precinct = ifelse(1%in%moved_new_precinct, min(year[moved_new_precinct==1]),0))
 
 # three_data<-three_data%>%
 #   # group by voter
@@ -111,17 +122,32 @@ two_data<-two_data%>%
 ############ testing data
 ## order by voterid
 two_data <- two_data[order(two_data$VOTERID),]
-mini_data<-two_data[1:1000000,]
+mini_data<-two_data[1:500000,]
+
+rigged_data<-two_data[1:1000000,c('VOTERID','voted','General_2019_11_05','ever_changed_precinct','year')]
+#changed_prec<- rbinom(500000,0:1,.015)
+#changed_prec<-rep(changed_prec,each=2)
+#rigged_data$ever_changed_precinct<-changed_prec
+#prob_vote<-runif(n=1000000,min=0,max=1)
+#normal_probs <- pmax(pmin(rnorm(1000000, mean = 0.3771259, sd = 0.4846669), 1), 0)
+#rigged_data$General_2019_11_05<-round(rigged_data$ever_changed_precinct*0.002+normal_probs, digits=0)
+#rigged_data$General_2019_11_05<-round(prob_vote, digits=0)
+out0 <- drdid(yname = "voted", #outcome
+              dname = "ever_changed_precinct", #treatment group 
+              idname = "VOTERID", #respondent
+              tname = "year",
+              data = rigged_data)
+out0
 
 #convert to integer to match year?
 #test$first_treated<-as.integer(test$first_treated)
 # test with fake outcome variable (works)
 #test$outcome<-rnorm(nrow(test))
-
-test<-mini_data%>%
-  ungroup()%>%
-  select(c(VOTERID,year,first_treated,voted,Voters_Gender,
-           Voters_Age))
+# 
+# test<-mini_data%>%
+#   ungroup()%>%
+#   select(c(VOTERID,year,first_treated,voted,Voters_Gender,
+#            Voters_Age))
 
 ##### DiD
 ## compare change in outcome over time b/t treatment & control groups
@@ -134,17 +160,19 @@ test<-mini_data%>%
 
 ###### Fixed effects regression framework, 2 periods, glm
 ### NOTE: some covariates switch year to year probably shouldn't (like gender), likely error
-c_pre<-mean(two_data$General_2018_11_06[(two_data$ever_changed_precinct==0 & two_data$time_period==0)])
-c_post<-mean(two_data$General_2019_11_05[(two_data$ever_changed_precinct==0 & two_data$time_period==1)])
-t_pre<-mean(two_data$General_2018_11_06[two_data$ever_changed_precinct==1 & two_data$time_period==0])
-t_post<-mean(two_data$General_2019_11_05[two_data$ever_changed_precinct==1 & two_data$time_period==1])
+## Manual calculation
+# c_pre<-mean(two_data$General_2018_11_06[(two_data$ever_changed_precinct==0 & two_data$time_period==0)])
+# c_post<-mean(two_data$General_2019_11_05[(two_data$ever_changed_precinct==0 & two_data$time_period==1)])
+# t_pre<-mean(two_data$General_2018_11_06[two_data$ever_changed_precinct==1 & two_data$time_period==0])
+# t_post<-mean(two_data$General_2019_11_05[two_data$ever_changed_precinct==1 & two_data$time_period==1])
+# 
+# difference_treated = t_post - t_pre #diff in trtment grp
+# difference_control = c_post - c_pre #diff in control grp
+# difference_in_differences = difference_treated  - difference_control
+# difference_in_differences #0.002115474
 
-difference_treated = t_post - t_pre #diff in trtment grp
-difference_control = c_post - c_pre #diff in control grp
-difference_in_differences = difference_treated  - difference_control
-difference_in_differences #0.002115474
-
-mini_model<-glm(voted~ever_moved_new_precinct*year,
+## TWFE glm
+mini_model<-glm(voted~ever_changed_precinct*year,
            data = two_data, family = 'binomial')
 summary(mini_model)
 # save model summary
@@ -153,34 +181,39 @@ sink("move_changed_prec_2WFE_mini_model_summary.txt")
 print(summary(mini_model))
 sink()
 
-#
-model<-glm(General_2019_11_05~ever_changed_precinct*time_period #interaction of being and treatment group and pre/post
-           +Voters_Gender+Voters_Age
-           +CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount
-           +known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry,
-           data = two_data, family = 'binomial')
-summary(model)
-# save model summary
-setwd(results_dir)
-sink("changed_prec_2WFE_model_summary.txt")
-print(summary(model))
-sink()
+## TWFE glm, control variables added incorrectly
+# model<-glm(voted~ever_changed_precinct*time_period #interaction of being and treatment group and pre/post
+#            +Voters_Gender
+#            +Residence_Families_HHCount
+#            +known_religious,
+#            data = two_data, family = 'binomial')
+# summary(model)
+# # save model summary
+# setwd(results_dir)
+# sink("changed_prec_2WFE_model_summary.txt")
+# print(summary(model))
+# sink()
 
 # ######## Estimating Group-Time Average Treatment Effect, 2-periods
 #covariates, must be time invariant
-### setting covariates to value at second time point
+### setting covariates to value at first time point to make them invariant (just for testing purposes)
+### Reminder to probably not include covariates that could be post-treatment, i.e. affected by changing precinct
 two_data<-two_data%>%
   group_by(VOTERID)%>%
-  mutate(Voters_Gender = Voters_Gender[2])
+  mutate(Voters_Gender = Voters_Gender[1])
 
-out0 <- drdid(yname = "General_2019_11_05", #outcome
-              dname = "FT_changed_prec", #treatment
+out0 <- drdid(yname = "voted", #outcome
+              dname = "ever_moved_new_precinct", #treatment group 
               idname = "VOTERID", #respondent
               tname = "year",
-              xformla = ~Voters_Gender, 
+              #xformla = ~Voters_Gender, 
               data = two_data)
-out0 #
-
+out0
+# save model summary
+setwd(results_dir)
+sink("moved_new_precinct_DRDiD_model_summary.txt")
+print(out0)
+sink()
 
 # Estimating Group-Time Average Treatment Effects,3+ periods
 ## issue with outcome variable
