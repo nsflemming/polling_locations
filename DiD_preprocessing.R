@@ -1,6 +1,5 @@
 #Nathaniel Flemming
 # 27/9/24
-#20/11/24
 
 # Preprocessing data for the difference in difference regressions
 ## uses data files made by L2_Raw_Processing scripts
@@ -61,12 +60,14 @@ poll_2018<-read_add_year(data_dir, 'L2PA_votehist_VM2_18.csv',2018)
 # rm(demog_addr_2017)
 #demog_addr_2018<-read_add_year(data_dir, 'L2PA_2018_address_in_18.csv', 2018)%>%
 demog_addr_2018<-read.csv(paste0(data_dir,'\\L2PA_2018_address_in_18.csv'))%>%
-  select(-c(X, County, Voters_FIPS, Precinct, location_category))
+  select(-c(X, County, Voters_FIPS, Precinct, location_category, pub_loc, pub_just,
+            other, relig_loc, school, multiple, justice_loc, library, relig_school))
 #poll_demog_addr<-left_join(poll_master, demog_addr_2018, by=c('LALVOTERID', 'year'))
 #rm(demog_addr_2018)
 #demog_addr_2019<-read_add_year(data_dir, 'L2PA_2019_address_in_19.csv', 2019)
 demog_addr_2019<-read.csv(paste0(data_dir,'\\L2PA_2019_address_in_19.csv'))%>%
-  select(-c(X, County, Voters_FIPS, Precinct,location_category))
+  select(-c(X, County, Voters_FIPS, Precinct,location_category, pub_loc, pub_just,
+            other, relig_loc, school, multiple, justice_loc, library, relig_school))
 #poll_demog_addr<-left_join(poll_demog_addr, demog_addr_2019, by=c('LALVOTERID', 'year'))
 #rm(demog_addr_2019)
 
@@ -99,33 +100,44 @@ vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_201
 vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2018_11_06', 'Y')
 vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2019_11_05', 'Y')
 
-# Create treatment indicators
+# Create treatment indicators (takes a very long time)
 vote_poll_demog_addr_all<-vote_poll_demog_addr_all%>%
   group_by(LALVOTERID)%>%
   mutate(
     ## set to TRUE when precinct doesn't match previous
-    changed_prec = Precinct != lag(Precinct),
+    #changed_prec = Precinct != lag(Precinct),
     ## set to TRUE when address doesn't match previous
     changed_address = Residence_Addresses_AddressLine != lag(Residence_Addresses_AddressLine),
+    ## set to TRUE when polling location category doesn't match previous
+    changed_poll_cat = location_category != lag(location_category))%>%
     ## Once treated, all subsequent values = treated
     ### need extra step to avoid NAs in 2017
-    changed_prec = ifelse(is.na(lag(changed_prec)), changed_prec, 
-                          ifelse(lag(changed_prec), T, changed_prec)),
-    changed_address = ifelse(is.na(lag(changed_address)), changed_address, 
-                             ifelse(lag(changed_address), T, changed_address)))%>%
+    #changed_prec = ifelse(is.na(lag(changed_prec)), changed_prec, 
+    #                      ifelse(lag(changed_prec), T, changed_prec)),
+    #changed_address = ifelse(is.na(lag(changed_address)), changed_address, 
+    #                         ifelse(lag(changed_address), T, changed_address)),
+    #changed_poll_cat = ifelse(is.na(lag(changed_poll_cat)), changed_poll_cat, 
+    #                      ifelse(lag(changed_poll_cat), T, changed_poll_cat)))%>%
   group_by(year)%>%
   mutate(
-    ## set missing to FALSE
-    changed_prec = ifelse(is.na(changed_prec), F, changed_prec),
-    changed_address = ifelse(is.na(changed_address), F, changed_address))%>%
+    ## set missing to FALSE (didn't change as far as we know)
+    #changed_prec = ifelse(is.na(changed_prec), F, changed_prec),
+    changed_address = ifelse(is.na(changed_address), F, changed_address),
+    changed_poll_cat = ifelse(is.na(changed_poll_cat), F, changed_poll_cat))%>%
   ungroup()%>%
   # Create treatment indicators based on first indicators
   group_by(LALVOTERID)%>%
   mutate(
     # moved & precinct changed
-    moved_new_precinct = (changed_address==TRUE & changed_prec==TRUE),
+    #moved_new_precinct = (changed_address==TRUE & changed_prec==TRUE),
     # didn't move, but precinct changed (should that be possible? double check when precincts change)
-    no_move_new_precinct = (changed_address==FALSE & changed_prec==TRUE))%>%
+    #no_move_new_precinct = (changed_address==FALSE & changed_prec==TRUE),
+    #moved and poll location category changed
+    moved_new_poll= (changed_address==TRUE & changed_poll_cat==TRUE),
+    #didn't move but poll location category changed
+    no_move_new_poll = (changed_address==FALSE & changed_poll_cat==TRUE),
+    #moved, but  poll location category unchanged
+    moved_old_poll= (changed_address==TRUE & changed_poll_cat==FALSE))%>%
   ungroup()
 # recreate location dummies for use as treatment variables for location effects
 
@@ -133,8 +145,14 @@ vote_poll_demog_addr_all<-vote_poll_demog_addr_all%>%
 vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year,
                                    General_2016_11_08,General_2017_11_07,
                                    General_2018_11_06,General_2019_11_05,
-                                   changed_address,changed_prec,moved_new_precinct,
-                                   no_move_new_precinct,
+                                   changed_address,
+                                   #changed_prec,
+                                   changed_poll_cat,
+                                   #moved_new_precinct,
+                                   #no_move_new_precinct,
+                                   moved_new_poll,
+                                   no_move_new_poll,
+                                   moved_old_poll,
                                    location_category,
                                    Voters_Gender,Voters_Age,
                                    CommercialData_EstimatedHHIncomeAmount,
@@ -151,11 +169,15 @@ vote_poll_demog_addr_all$VOTERID<-as.numeric(vote_poll_demog_addr_all$VOTERID)
 #model_data$year<-model_data$year+2017
 ## treatment
 vote_poll_demog_addr_all$changed_address<-as.numeric(vote_poll_demog_addr_all$changed_address)
-vote_poll_demog_addr_all$changed_prec<-as.numeric(vote_poll_demog_addr_all$changed_prec)
-vote_poll_demog_addr_all$no_move_new_precinct<-as.numeric(vote_poll_demog_addr_all$no_move_new_precinct)
-vote_poll_demog_addr_all$moved_new_precinct<-as.numeric(vote_poll_demog_addr_all$moved_new_precinct)
+#vote_poll_demog_addr_all$changed_prec<-as.numeric(vote_poll_demog_addr_all$changed_prec)
+vote_poll_demog_addr_all$changed_poll_cat<-as.numeric(vote_poll_demog_addr_all$changed_poll_cat)
+vote_poll_demog_addr_all$moved_new_poll<-as.numeric(vote_poll_demog_addr_all$moved_new_poll)
+vote_poll_demog_addr_all$no_move_new_poll<-as.numeric(vote_poll_demog_addr_all$no_move_new_poll)
+vote_poll_demog_addr_all$moved_old_poll<-as.numeric(vote_poll_demog_addr_all$moved_old_poll)
+#vote_poll_demog_addr_all$no_move_new_precinct<-as.numeric(vote_poll_demog_addr_all$no_move_new_precinct)
+#vote_poll_demog_addr_all$moved_new_precinct<-as.numeric(vote_poll_demog_addr_all$moved_new_precinct)
 
 # save data
 setwd(data_dir)
-write.csv(vote_poll_demog_addr_all, 'DiD_prepped_loc_vote_18to19.csv')
+write.csv(vote_poll_demog_addr_all, 'DiD_prepped_poll_vote_18to19.csv')
 
