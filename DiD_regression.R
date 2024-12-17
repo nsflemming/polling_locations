@@ -71,7 +71,8 @@ two_data<-two_data%>%
   group_by(LALVOTERID)%>%
   mutate(ever_changed_precinct=sum(changed_prec), #300,838 cases (2%)
          ever_no_move_new_precinct=sum(no_move_new_precinct), #367,478 cases (3%)
-         ever_moved_new_precinct=sum(moved_new_precinct))%>% #66,640 cases (0.5%)
+         ever_moved_new_precinct=sum(moved_new_precinct),
+         ever_changed_poll_cat=(sum(changed_poll_cat)>0))%>% #66,640 cases (0.5%)
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
   mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))%>%
@@ -82,7 +83,8 @@ two_data<-two_data%>%
   # # create year changed precinct variable
   mutate(yr_changed_prec=ifelse(changed_prec==1, year, 0),
          yr_no_move_new_precinct=ifelse(no_move_new_precinct==1, year, 0),
-         yr_moved_new_precinct=ifelse(moved_new_precinct==1, year, 0))%>%
+         yr_moved_new_precinct=ifelse(moved_new_precinct==1, year, 0),
+         yr_changed_poll_cat=ifelse(changed_poll_cat==1, year, 0))%>%
   # ungroup back to voter
   ungroup()
   # group_by(LALVOTERID)%>%
