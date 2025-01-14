@@ -9,8 +9,8 @@
 library(tidyverse)
 library(data.table) #read in L2 data selectively
 library(stringr) #string manipulation
-library(fuzzyjoin) #fuzzy match precinct names
-library(stringdist) #fuzzy match precinct names
+#library(fuzzyjoin) #fuzzy match precinct names
+#library(stringdist) #fuzzy match precinct names
 
 ########## Functions
 
