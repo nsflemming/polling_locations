@@ -1,12 +1,11 @@
 #Nathaniel Flemming
 #18/10/24
-#19/10/24
 
 library(tidyverse)
 library(data.table) #read in L2 data selectively
 library(stringr) #string manipulation
-library(fuzzyjoin) #fuzzy match precinct names
-library(stringdist) #fuzzy match precinct names
+#library(fuzzyjoin) #fuzzy match precinct names
+#library(stringdist) #fuzzy match precinct names
 
 ########## Create voter history files from L2 data and combined voter and poll location files from Combine_voterfile_pollocation
 
@@ -55,30 +54,6 @@ most_prob_race<-function(data){
   return(data)
 }
 
-### fuzzy match precinct names within counties
-fuzzy_match_precincts<-function(df1, df2, prec_var='Precinct',prec_var2='PrecinctName',
-                                county_var='County'){
-  # get list of counties
-  counties<-unique(df1[[county_var]])
-  # create crosswalk data frame
-  crosswalk<-data.frame()
-  for(county in counties){
-    # get list of precincts w/in county
-    list1<-unique(df1[[prec_var]][df1[[county_var]]==county])
-    list2<-unique(df2[[prec_var2]][df2[[county_var]]==county])
-    ## calculate string distance b/t each precinct
-    result<-stringdistmatrix(list1, list2, method='jw')
-    ## get index of col with lowest value for each row
-    closest_match<-apply(result, 1, which.min)
-    # create crosswalk for the county
-    temp<-as.data.frame(cbind('County'=county,'Precinct'=list1,list2[closest_match]))
-    print(county)
-    # bind into larger crosswalk
-    crosswalk<-rbind(crosswalk, temp)
-  }
-  return(crosswalk)
-}
-
 ## convert dollars to numeric
 dollar_to_num <- function(data, inc_var){
   #remove $
@@ -102,10 +77,10 @@ educ_to_ord <- function(data, educ_var, mapping){
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
-L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
+L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
 
 #set polling location data year
-poll_year=2018
+poll_year=2017
 
 # Set variable lists
 ## adjust as needed based on elections of interest
@@ -120,12 +95,13 @@ demog_vars<-c('LALVOTERID','Voters_StateVoterID','County','Voters_FIPS','Precinc
 #L2demog<-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-DEMOGRAPHIC.tab', demog_vars)
 # Combine L2 data
 #L2votehist<-left_join(L2votehist, L2demog, by = 'LALVOTERID')
-L2votehist<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+L2votehist<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', demog_vars)
 
 ################# merge L2 data with polling location data
 # Read in location/category data
 poll <- get_poll_data(data_dir, paste0('FVE_',poll_year,'_polllocation.csv'), 
-                      c('VOTERID','County', 'PrecinctName', 'location_category'))
+                      c('VOTERID','County', 'PrecinctName', 'location_category',
+                        'Description'))
 ### Replace '-' in L2 precinct names to better match government format
 L2votehist<-L2votehist%>%
   mutate(across('Precinct',\(x) str_replace(x,'-', ' ') ))#deprecated syntax?
@@ -167,7 +143,7 @@ sum(is.na(merged$PrecinctName))
 
 ################# write to csv
 setwd(data_dir)
-write.csv(merged, 'L2PA_votehist_VM2_19.csv')
+write.csv(merged, 'L2PA_votehist_VM2_17.csv')
 
 
 
