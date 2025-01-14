@@ -1,7 +1,8 @@
 #Nathaniel Flemming
 # 24/1/24
 
-# Regressions
+# Regressions, using data created by
+
 
 library(tidyverse)
 library(data.table) #read in data selectively
@@ -187,9 +188,9 @@ pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, mean_vo
 
 ########################################################### Main
 # set directories
-data_dir <- "C:/Users/natha/Desktop/Polling Places/data"
-results_dir <-"C:/Users/natha/Desktop/Polling Places/model_results"
-plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
+data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
+results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/ESRA Poster Regressions"
+plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 # read in data
 setwd(data_dir)
 model_data<-read.csv('L2PA_full.csv')
@@ -230,8 +231,6 @@ model_data[,col_names]<-lapply(model_data[,col_names],factor)
 # Drop unused levels
 model_data<-droplevels(model_data)
 
-## subset data for initial testing
-#mini_data <- model_data[sample(nrow(model_data), 100000),]
 
 ## create vector of location categories
 categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
@@ -268,7 +267,7 @@ common_covars <-c(
 )
 
 ##set dependent variable
-dep_var = 'General_2017_11_07'
+dep_var = 'General_2018_11_06'
 year=substr(dep_var,9,12)
 ### calculate turnout for election
 turnout <- mean(model_data[[dep_var]], na.rm=T)
@@ -281,7 +280,7 @@ ind_vars_loc<-c('location_category',common_covars)
 m_base<-log_reg(model_data, dep_var, ind_vars_loc)
 summary(m_base)
 #save results
-write_summ(results_dir, paste0('base_',year), m_base)
+#write_summ(results_dir, paste0('base_',year), m_base)
 # calculate and plot predicted probabilities using Marginal Effect at the Means
 #   see ggeffects documentation for details, but numerical variables are set to the mean
 #   and effects for categorical variables are calculated  as a weighted average
@@ -311,7 +310,7 @@ ind_vars_child_schl <-c(
 m_schl<-log_reg(model_data, 'General_2018_11_06', ind_vars_child_schl)
 summary(m_schl)
 #save results
-write_summ(results_dir, 'school_2018', m_schl)
+#write_summ(results_dir, 'school_2018', m_schl)
 ## Calculate and plot predicted probabilities
 schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='marginalmeans')
 #plot predicted probabilities
@@ -319,7 +318,7 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = tu
                plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations'),
                xlab='Has a Child/Children', x_axis_labels = c('FALSE', 'TRUE'),
                legend_exist=T, legend_title ='Votes at a School', angle=0,legend_position = 'right',
-               output_dir = plot_dir, image_name = 'Pred_Prob_child_school_2018')
+               output_dir = plot_dir, image_name = paste0('Pred_Prob_child_school_',year))
 
 
 ##### Probability of Voting, if gov employee and is voting at gov building
@@ -333,7 +332,7 @@ ind_vars_gov_emp <-c(
 m_gov<-log_reg(model_data, 'General_2018_11_06', ind_vars_gov_emp)
 summary(m_gov)
 #save results
-write_summ(results_dir, 'gov_employees_2018', m_gov)
+#write_summ(results_dir, 'gov_employees_2018', m_gov)
 ## Calculate and plot predicted probabilities
 gov_pred<-predict_response(m_gov, terms=c('known_gov_emp','pub_loc'), margin='marginalmeans')
 #plot predicted probabilities
@@ -342,12 +341,13 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, gov_pred, mean_vote = tur
                xlab='Is a Government Employee', x_axis_labels = c('FALSE', 'TRUE'),
                legend_exist=T, legend_title ='Votes at a Public Building', 
                angle=0,legend_position = 'right', output_dir = plot_dir, 
-               image_name = 'Pred_Prob_govemp_pub_2018')
+               image_name = paste0('Pred_Prob_govemp_pub_',year))
 
 
-######### Probability of Voting, if known_republican at each building type
+######### Probability of Voting, if known_republican at building type
 ## create interaction terms
-interactions<-paste('Parties_Description*',categories, sep='')
+category<-c('relig_loc')
+interactions<-paste('Parties_Description*',category, sep='')
 ## remove parties variable
 repub_covars<-common_covars[! common_covars %in% c('Parties_Description')]
 ## run models and plot results
@@ -359,9 +359,10 @@ log_reg_inter_plus_plot(model_data, dep_var='General_2018_11_06',
                         results_dir = results_dir, image_dir=plot_dir)
 
 
-### Probability of Voting, if known_religious at each building type
+### Probability of Voting, if known_religious at building type
 ## create interaction terms
-interactions<-paste('known_religious*',categories, sep='')
+category<-c('relig_loc')
+interactions<-paste('known_religious*',category, sep='')
 ## remove religion variable
 relig_covars<-common_covars[! common_covars %in% c('known_religious')]
 ## run models and plot results
