@@ -119,6 +119,7 @@ demog_vars<-c('LALVOTERID',
               ###'MaritalStatus_Description',
               'CommercialData_Education', 'CommercialData_HHComposition',
               'CommercialData_EstimatedHHIncomeAmount',
+              'CommercialData_EstimatedIncomeAmount',
               'CommercialData_LikelyUnion', 'CommercialData_OccupationGroup',
               'CommercialData_OccupationIndustry',
               #Political
