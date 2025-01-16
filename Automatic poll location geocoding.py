@@ -9,31 +9,14 @@ import requests # to interact with API
 
 ################## Main
 #set working directory
-os.chdir('C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\gov_poll_places')
+os.chdir('C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\gov_poll_places geocoded')
 
-#create county names list
-counties = ['ADAMS', 'ALLEGHENY', 'ARMSTRONG', 'BEAVER', 'BEDFORD', 'BERKS', 'BLAIR', 'BRADFORD', 'BUCKS', 'BUTLER',
-            'CAMBRIA', 'CAMERON', 'CARBON', 'CENTRE', 'CHESTER', 'CLARION', 'CLEARFIELD', 'CLINTON', 'COLUMBIA',
-            'CRAWFORD', 'CUMBERLAND', 'DAUPHIN', 'DELAWARE', 'ELK', 'ERIE', 'FAYETTE', 'FOREST', 'FRANKLIN', 'FULTON',
-            'GREENE', 'HUNTINGDON', 'INDIANA', 'JEFFERSON', 'JUNIATA', 'LACKAWANNA', 'LANCASTER', 'LAWRENCE', 'LEBANON',
-            'LEHIGH', 'LUZERNE', 'LYCOMING', 'MCKEAN', 'MERCER', 'MIFFLIN', 'MONROE', 'MONTGOMERY', 'MONTOUR',
-            'NORTHAMPTON', 'NORTHUMBERLAND', 'PERRY', 'PHILADELPHIA', 'PIKE', 'POTTER', 'SCHUYLKILL', 'SNYDER',
-            'SOMERSET', 'SULLIVAN', 'SUSQUEHANNA', 'TIOGA', 'UNION', 'VENAGO', 'WARREN', 'WASHINGTON', 'WAYNE',
-            'WESTMORELAND', 'WYOMING', 'YORK']
-# remaining counties
-'''counties = ['ARMSTRONG', 'BEAVER', 'BEDFORD', 'BERKS', 'BLAIR', 'BRADFORD', 'BUCKS', 'BUTLER',
-            'CAMBRIA', 'CAMERON', 'CARBON', 'CENTRE', 'CHESTER', 'CLARION', 'CLEARFIELD', 'CLINTON', 'COLUMBIA',
-            'CRAWFORD', 'CUMBERLAND', 'DAUPHIN', 'DELAWARE', 'ELK', 'ERIE', 'FAYETTE', 'FOREST', 'FRANKLIN', 'FULTON',
-            'GREENE', 'HUNTINGDON', 'INDIANA', 'JEFFERSON', 'JUNIATA', 'LACKAWANNA', 'LANCASTER', 'LAWRENCE', 'LEBANON',
-            'LEHIGH', 'LUZERNE', 'LYCOMING', 'MCKEAN', 'MERCER', 'MIFFLIN', 'MONROE', 'MONTGOMERY', 'MONTOUR',
-            'NORTHAMPTON', 'NORTHUMBERLAND', 'PERRY', 'PHILADELPHIA', 'PIKE', 'POTTER', 'SCHUYLKILL', 'SNYDER',
-            'SOMERSET', 'SULLIVAN', 'SUSQUEHANNA', 'TIOGA', 'UNION', 'VENAGO', 'WARREN', 'WASHINGTON', 'WAYNE',
-            'WESTMORELAND', 'WYOMING', 'YORK']'''
-
+#create years names list
+years = ['2018','2019','2020','2021','2022','2023']
 
 #use geocoder API to geocode
 ## path to FVEs for geocoding
-path = 'C:/Users/natha/Desktop/Polling Places DiD/data/FVEs for geocode/'
+path = 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places for geocode/'
 ## list of all FVE files that have a county in the county name list
 files = os.listdir(path)
 
@@ -42,7 +25,7 @@ for csv in files:
     print(filepath)
     file = {
         'addressFile': open(filepath, 'rb'),
-        'benchmark': (None, 'Public_AR_Current'),
+        'benchmark': (None, 'Public_AR_Census2020'),
     }
     ##execute the API command
     response = requests.post('https://geocoding.geo.census.gov/geocoder/locations/addressbatch', files=file)
