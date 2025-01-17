@@ -138,7 +138,6 @@ sum(is.na(merged$PrecinctName))
 # sum(pollid%in%voterid)
 # pollid=sort(pollid)
 
-#crosswalk<-fuzzy_match_precincts(L2votehist, poll)
 
 
 ################# write to csv
