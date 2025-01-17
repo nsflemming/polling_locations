@@ -282,17 +282,25 @@ common_covars <-c(
   'CommercialData_OccupationGroup'
 )
 ## Factor variables
+#location categories
 model_data$location_category<-as.factor(model_data$location_category)
 model_data$location_category<-relevel(model_data$location_category, ref='other')
+#race
 model_data$pred_race <- as.factor(model_data$pred_race)
 model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi")
+#political party
 model_data$Parties_Description <- as.factor(model_data$Parties_Description)
 model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
+#religious
 model_data$known_religious<-as.factor(model_data$known_religious)
+#child present
 model_data$has_child<-as.factor(model_data$has_child)
+#government employee
 model_data$known_gov_emp <- ifelse(model_data$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
 model_data$known_gov_emp<-as.factor(model_data$known_gov_emp)
+#union member
 model_data$CommercialData_LikelyUnion<-as.factor(model_data$CommercialData_LikelyUnion)
+#occupational group
 model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
 model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
 
