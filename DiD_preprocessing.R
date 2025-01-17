@@ -7,6 +7,7 @@
 library(did) #difference in difference package
 library(tidyverse) #convenience
 library(data.table) #read in data selectively
+library(readxl) #read in excel sheets
 
 
 ########## Functions
@@ -55,7 +56,8 @@ most_prob_race<-function(data, race_vars){
 data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
 results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
-# read in vote history and poll location data
+
+### read in vote history and poll location data
 ## adding year indicator
 hist_poll_2020<-read_add_year(data_dir, 'L2PA_votehist_VM2_20.csv',2020)
 ### separate into polling location info and voting history
@@ -65,41 +67,33 @@ rm(hist_poll_2020)
 # read in poll location data
 poll_2019<-read_add_year(data_dir, 'L2PA_votehist_VM2_19.csv',2019)
 poll_2018<-read_add_year(data_dir, 'L2PA_votehist_VM2_18.csv',2018)
-# bind different years of polling locations together
-#poll_master<-rbind(poll_2019,poll_2018)
-# remove data frames to free up memory
-#rm(poll_2020, poll_2019, poll_2018)
-
+# Read in Religious census data
+setwd(data_dir)
+relig_census<-read_excel('2020_USRC_Group_Detail.xlsx', sheet = '2020 Group by County')
+# Read in distance to polling station data
+dist_data18<-read.csv('voterloc_pollloc_dist_2018.csv')
+dist_data19<-read.csv('voterloc_pollloc_dist_2019.csv')
 
 ### read in voter demographic and address data
 ## remove county and precinct columns since that's in the voter history/polling location files
-## add year indicator
-## 
-# free up memory
-# demog_addr_2016<-read_add_year(data_dir, 'L2PA_2016_address_in_16.csv', 2016)%>%
-#     select(-c(X, County, Precinct, Voters_FIPS, location_category, pub_loc, pub_just,
-#other, relig_loc, school, multiple, justice_loc, library, relig_school))
-
-# demog_addr_2017<-read_add_year(data_dir, 'L2PA_2017_address_in_17.csv', 2017)%>%
-#   select(-c(X, County, Precinct, Voters_FIPS, location_category, pub_loc, pub_just,
-#other, relig_loc, school, multiple, justice_loc, library, relig_school))
-
-#demog_addr_2018<-read_add_year(data_dir, 'L2PA_2018_address_in_18.csv', 2018)%>%
 demog_addr_2018<-read.csv(paste0(data_dir,'\\L2PA_2018_address_in_18.csv'))%>%
-  select(-c(X, County, Precinct, Voters_FIPS, location_category, pub_loc, pub_just,
+  select(-c(X, County, Precinct, Voters_FIPS, pub_loc, pub_just,
             other, relig_loc, school, multiple, justice_loc, library, relig_school))
-
-#demog_addr_2019<-read_add_year(data_dir, 'L2PA_2019_address_in_19.csv', 2019)
 demog_addr_2019<-read.csv(paste0(data_dir,'\\L2PA_2019_address_in_19.csv'))%>%
-  select(-c(X, County, Precinct, Voters_FIPS,location_category, pub_loc, pub_just,
+  select(-c(X, County, Precinct, Voters_FIPS, pub_loc, pub_just,
             other, relig_loc, school, multiple, justice_loc, library, relig_school))
-
 
 #### Merge poll location data with voter demographic data on L2 voterid
 demog_addr_2018<-left_join(demog_addr_2018, poll_2018, by='LALVOTERID')
 demog_addr_2019<-left_join(demog_addr_2019, poll_2019, by='LALVOTERID')
 # remove data frames to free up memory
 rm(poll_2018, poll_2019)
+
+#### Merge distance to poll station data with voter demographic data on L2 voterid
+demog_addr_2018<-left_join(demog_addr_2018, dist_data18, by='LALVOTERID')
+demog_addr_2019<-left_join(demog_addr_2019, dist_data19, by='LALVOTERID')
+# remove data frames to free up memory
+rm(dist_data18, dist_data19)
 
 #### rbind years together
 ## make column names match (check that income variables are equivalent)
@@ -125,7 +119,19 @@ vote_poll_demog_addr_all<-left_join(poll_demog_addr_all, hist_2020, by='LALVOTER
 # remove data frames to free up memory
 rm(hist_2020, poll_demog_addr_all)
 
-# Convert vote to binary
+### Merge in religious census data on county name
+# filter religious data to just PA... 
+# relig_census<-relig_census%>%
+#   filter(`State Name`=='Pennsylvania', `Group Name`=='Catholic Church')%>%
+#   #and select county name, group, congregations, and adherents in population
+#   select(c(`County Name`,`Group Name`,Congregations, `Adherents as % of Total Population`))
+# # and bring county names into line with L2 and government data
+# relig_census$`County Name`<-str_extract(relig_census$`County Name`, '[:alpha:]*(?=[:space:])')
+# relig_census$County<-toupper(relig_census$`County Name`)
+# # merge in 
+# vote_poll_demog_addr_all<-left_join(vote_poll_demog_addr_all, relig_census, by='County')
+
+### Convert vote to binary
 vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2016_11_08', 'Y')
 vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2017_11_07', 'Y')
 vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_2018_11_06', 'Y')
@@ -176,7 +182,7 @@ vote_poll_demog_addr_all$no_move_new_poll_loc=((vote_poll_demog_addr_all$changed
 #mini<-vote_poll_demog_addr_all[3000000:4000000,]
 
 
-# drop variables not in DiD Models
+# drop variables not in Regression and DiD Models
 vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year, 
                                                              County, Precinct,
                                    General_2016_11_08,General_2017_11_07,
@@ -194,12 +200,14 @@ vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year,
                                    Voters_Gender,Voters_Age,
                                    CommercialData_EstimatedHHIncomeAmount,
                                    Residence_Families_HHCount,has_child,
-                                   known_religious,CommercialData_LikelyUnion,
+                                   Religions_Description,known_religious,
+                                   CommercialData_LikelyUnion,
                                    CommercialData_OccupationIndustry,
                                    CommercialData_OccupationGroup,
                                    Parties_Description,
                                    pred.whi,pred.bla,pred.his,pred.asi,pred.oth,
-                                   pred_race))
+                                   pred_race,
+                                   Shape_Length))
 
 # Modify variables to fit DiD package requirements
 ## ID
