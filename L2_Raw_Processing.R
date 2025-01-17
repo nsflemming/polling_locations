@@ -1,12 +1,14 @@
 #Nathaniel Flemming
 #6/2/24
-#9/10/24
 
+# Get address history information and demographics from the L2 files
+## don't need voting history since the 2018 general election is in the 2019 file
+
+#Packages
 library(tidyverse)
 library(data.table) #read in L2 data selectively
 library(stringr) #string manipulation
-library(fuzzyjoin) #fuzzy match precinct names
-library(stringdist) #fuzzy match precinct names
+
 
 ########## Functions
 
@@ -53,29 +55,6 @@ most_prob_race<-function(data){
   return(data)
 }
 
-### fuzzy match precinct names within counties
-fuzzy_match_precincts<-function(df1, df2, prec_var='Precinct',prec_var2='PrecinctName',
-                                county_var='County'){
-  # get list of counties
-  counties<-unique(df1[[county_var]])
-  # create crosswalk data frame
-  crosswalk<-data.frame()
-  for(county in counties){
-    # get list of precincts w/in county
-    list1<-unique(df1[[prec_var]][df1[[county_var]]==county])
-    list2<-unique(df2[[prec_var2]][df2[[county_var]]==county])
-    ## calculate string distance b/t each precinct
-    result<-stringdistmatrix(list1, list2, method='jw')
-    ## get index of col with lowest value for each row
-    closest_match<-apply(result, 1, which.min)
-    # create crosswalk for the county
-    temp<-as.data.frame(cbind('County'=county,'Precinct'=list1,list2[closest_match]))
-    print(county)
-    # bind into larger crosswalk
-    crosswalk<-rbind(crosswalk, temp)
-  }
-  return(crosswalk)
-}
 
 ## convert dollars to numeric
 dollar_to_num <- function(data, inc_var){
@@ -101,6 +80,8 @@ data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
 L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2__PA__2020_10_01'
+#set year
+year=2017
 
 # Set variable lists
 ## adjust as needed based on elections of interest
@@ -124,83 +105,56 @@ demog_vars<-c('LALVOTERID',
               'CommercialData_OccupationIndustry',
               #Political
               'Parties_Description'
-              #Misc
-              #'MilitaryStatus_Description'
               )
 
 # Read in data
 L2votehist <-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-VOTEHISTORY.tab', vote_vars)
 L2demog<-get_L2_data(L2_dir, 'VM2--PA--2020-10-01-DEMOGRAPHIC.tab', demog_vars)
+
 ## race estimates
-setwd(race_data_dir)
-#load('PA_2016_race.Rdata')
-#race16<-df.pred
-#race17<-read.csv('pa2017.csv')
-race18<-read.csv(paste0(race_data_dir,'\\pa2018.csv'))
+#setwd(race_data_dir)
+#race16<-read.csv('pa2016.csv')
+#race17<-read.csv(paste0(race_data_dir,'\\pa2017.csv'))
+#race18<-read.csv(paste0(race_data_dir,'\\pa2018.csv'))
 ### (2018 has two rows for LALPA182948529)
 #race19<-read.csv(paste0(race_data_dir,'\\pa2019.csv'))
 ### (2019 has two row for LALPA680572)
-#rm(df.pred)
+race<-read.csv(paste0(race_data_dir,'\\pa',year,'.csv'))
 
-## Remove repeated voters (keeps first entry)
-race18<-distinct(race18, LALVOTERID, .keep_all=T)
+
+## Remove repeated/duplicated voters (keeps first entry)
+#race18<-distinct(race18, LALVOTERID, .keep_all=T)
 #race19<-distinct(race19, LALVOTERID, .keep_all=T)
+race<-distinct(race, LALVOTERID, .keep_all=T)
 
 # add year indicator to column names
-race18<-add_year(race18, '2018')
+#race18<-add_year(race18, '2018')
 #race19<-add_year(race19, '2019')
+race<-add_year(race, year)
 # create column with most probable race for each voter
-race18<-most_prob_race(race18)
+#race18<-most_prob_race(race18)
 #race19<-most_prob_race(race19)
+race<-most_prob_race(race)
 # Create black dummy variable
-race18$pred_black<-ifelse(race18$pred_race=='pred.bla_2018', TRUE, FALSE)
-race19$pred_black<-ifelse(race19$pred_race=='pred.bla_2019', TRUE, FALSE)
+#race18$pred_black<-ifelse(race18$pred_race=='pred.bla_2018', TRUE, FALSE)
+#race19$pred_black<-ifelse(race19$pred_race=='pred.bla_2019', TRUE, FALSE)
+race$pred_black<-ifelse(race$pred_race==paste0('pred.bla_',year), TRUE, FALSE)
 # convert race to factor(? not sure necessary)
-race18$pred_race<-as.factor(race18$pred_race)
-race19$pred_race<-as.factor(race19$pred_race)
+#race18$pred_race<-as.factor(race18$pred_race)
+#race19$pred_race<-as.factor(race19$pred_race)
+race$pred_race<-as.factor(race$pred_race)
 
 # Combine L2 data
 test<-left_join(L2demog, L2votehist, by = 'LALVOTERID')
 ## remove duplicate rows
 #race18<-unique(race18)
 ## merge in race estimates
-test<-left_join(test, race18, by='LALVOTERID')
-test<-left_join(test, race19, by='LALVOTERID')
+test<-left_join(test, race, by='LALVOTERID')
 ### drop voterhistory
 rm(L2votehist)
 ### drop race imputations
-rm(race18)
-rm(race19)
-
-################# merge L2 data with polling location data
-# Read in location/category data
-poll <- get_poll_data(data_dir, 'poll_struct_key_govsource19.csv', 
-                      c('CountyName', 'PrecinctName', 'location_category'))
-## rename variables to match L2
-poll<-poll%>%
-  rename('County'='CountyName')
-### Replace '-' in L2 precinct names to better match government format
-L2demog<-L2demog%>%
-  mutate(across('Precinct', str_replace, '-', ' '))#deprecated syntax?
-### Convert government county names to all caps to match L2
-poll$County<-toupper(poll$County)
-
-## Create a crosswalk by fuzzy matching precinct names (replace with something more official)
-crosswalk<-fuzzy_match_precincts(L2demog, poll)
-####### Double check inexact matches
-# rename columns to match other data sets
-crosswalk<-crosswalk%>%
-  rename('PrecinctName'='V3')
-## Join the crosswalk into L2 
-L2demog<-left_join(L2demog, crosswalk, by=c('County','Precinct'))
-
-#### join the poll location categories in
-L2demog<-left_join(L2demog, poll, by=c('County','PrecinctName'))
-## drop location 
-rm(poll)
-#7677867-sum(is.na(L2demog$precinct_id))
-##### Drop extraneous variables
-#L2demog <- subset(L2demog, select = -c(X, index))
+#rm(race18)
+rm(race)
 
 ####################### Process L2 data to more usable forms
 # Convert income to numeric
@@ -239,6 +193,8 @@ L2demog$CommercialData_OccupationGroup<-as.factor(L2demog$CommercialData_Occupat
 L2demog$has_child <- str_detect(L2demog$CommercialData_HHComposition, 'Children|children')
 # Convert religious description to know religious yes/no, set blank to no
 L2demog$known_religious <- L2demog$Religions_Description!=""
+# Convert religious description to Catholic binary variable
+L2demog$known_catholic <- L2demog$Religions_Description=="Catholic"
 # Convert gender to M/F, set blank to missing
 L2demog$Voters_Gender <- ifelse(L2demog$Voters_Gender=="",NA,L2demog$Voters_Gender)
 ## Create Location dummy variables
@@ -260,7 +216,7 @@ L2demog$known_repub <- ifelse(L2demog$Parties_Description=="Republican",TRUE,FAL
 
 ################# write to csv
 setwd(data_dir)
-write.csv(L2demog, '')
+write.csv(L2demog, paste0('L2PA_',year,'_address_in_',year%%100,'.csv'))
 
 #mini_data <- L2demog[sample(nrow(L2demog), 100000),]
 
