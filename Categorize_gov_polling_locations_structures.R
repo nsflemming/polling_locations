@@ -4,7 +4,7 @@
 
 library(dplyr)
 library(stringr) #string manipulation
-
+library() #fuzzy matching church names
 
 #define functions
 
@@ -138,9 +138,9 @@ get_educ_data <- function(dir, filenames){
 #############################################
 
 #set directories
-struct_dir <- 'C:/Users/natha/Desktop/Polling Places/data/Structures'
-poll_dir <- 'C:/Users/natha/Desktop/Polling Places/data/gov_poll_places'
-plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
+struct_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/Structures'
+poll_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places'
+plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 
 ## string for abbreviating street names
 rep_str <- c(' STREET'=' ST', ' ROAD'=' RD', ' AVENUE'=' AVE', ' DRIVE'=' DR', 
@@ -168,6 +168,28 @@ worship<-get_process_struct_data(struct_dir, 'All_Places_Of_Worship_HIFLD.csv',
                                  street_var = 'STREET', city_var='CITY',
                                  state_var='STATE', zip_var = "ZIP", 
                                  structure_name = 'religious')
+
+## Catholic Churches
+#catholic<-read.csv(paste0(struct_dir,'\\Cath_Dir_PA_Churches_1_20_2025.csv'))
+### incomplete addresses
+
+## Catholic Schools
+cath_school<-read.csv(paste0(struct_dir,'/MSA_PA_Catholic_Schools_1_18_2025.csv'))
+### Process address into standard format
+#### remove united states and phone number
+cath_school$address<-str_extract(cath_school$Address, ".*(?=\\,\\sUnited)")
+#### shorten longer zip codes
+cath_school$zip<-str_extract(cath_school$address, "([:digit:]+[:punct:][:digit:]+|[:digit:]{5})$")
+cath_school$zip<-str_sub(cath_school$zip, end=5)
+#### replace zip codes in addresses
+cath_school$address<-str_extract(cath_school$address, ".*(?=\\s[:digit:]+)")
+cath_school$address<-paste0(cath_school$address, ' ', cath_school$zip)
+#### capitalize
+cath_school$address<-toupper(cath_school$address)
+#### location category
+cath_school$location_category<-'catholic_school'
+#### Trim
+cath_school<-select(cath_school, c('address', 'location_category'))
 
 ## Education buildings
 educ_files<-c('Educational_Structures_NGDA_2023/Colleges_Universities_0.csv',
@@ -234,25 +256,27 @@ nat_map2<-subset(nat_map2, select = -c(ftype,fcode))
 ## one building can be multiple categories
 ### mark whether building is a category
 ### since issue with duplication one building is on multiple lists
-structures<-rbind(worship, education, firestations, policestations, 
+structures<-rbind(worship, cath_school, education, firestations, policestations, 
                   nat_map2, libraries)
 structures<-structures%>%
   mutate(religious=as.numeric(str_detect(location_category, 'religious')),
+         catholic_school=as.numeric(str_detect(location_category, 'catholic_school')),
          school=as.numeric(str_detect(location_category, 'school')),
          public=as.numeric(str_detect(location_category, 'public')),
          justice=as.numeric(str_detect(location_category, 'justice')),
          #allegh_pub=as.numeric(str_detect(location_category, 'allegh_pub')),
          other=as.numeric(str_detect(location_category, 'other')),
          library=as.numeric(str_detect(location_category, 'library')))
-#remove uncategorized structures
+#remove uncategorized structures?
 structures<-structures[complete.cases(structures),]
 
 ############# merge
 ### put dataframes into a list
-poll_dfs<-list('2018'=poll_loc2018, '2019'=poll_loc2019,
-               '2020'=poll_loc2020, '2021'=poll_loc2021, 
-               '2022'=poll_loc2022, '2023'=poll_loc2023)
-# join poll locations to structures matrix
+poll_dfs<-list('2018'=poll_loc2018, '2019'=poll_loc2019
+               #,'2020'=poll_loc2020, '2021'=poll_loc2021, 
+               #'2022'=poll_loc2022, '2023'=poll_loc2023
+               )
+# join poll locations to structures matrix on address
 for(i in seq_along(poll_dfs)){
   #Join
   temp<-left_join(poll_dfs[[i]], structures, 'address', relationship='many-to-many')
@@ -262,9 +286,10 @@ for(i in seq_along(poll_dfs)){
   assign(paste0('poll_struct',names(poll_dfs)[i]),temp)
 }
 ### put dataframes into a list again
-poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019,
-               '2020'=poll_struct2020, '2021'=poll_struct2021, 
-               '2022'=poll_struct2022, '2023'=poll_struct2023)
+poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019
+               #,'2020'=poll_struct2020, '2021'=poll_struct2021, 
+               #'2022'=poll_struct2022, '2023'=poll_struct2023
+               )
 
 ## save a copy of structure categorization matrix
 #write.csv(polltest, 'structure_matrix.csv')
@@ -272,9 +297,8 @@ poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019,
 for(i in seq_along(poll_struct_dfs)){
   temp<-poll_struct_dfs[[i]]%>%
     group_by(address, PrecinctCode)%>%
-    mutate(location_count = sum(across(c(religious,school,public,justice,other,
-                                         #allegh_pub,
-                                         library))))%>%
+    mutate(location_count = sum(across(c(religious,catholic_school,school,public,
+                                         justice,other,library))))%>%
     ungroup()
   ###### Create categories for multicategory locations
   ### change locations with multiple categories to 'multiple' as a default
@@ -300,7 +324,7 @@ for(i in seq_along(poll_struct_dfs)){
   ##(still have extra rows?)
   ####### save to csv
   #set directory
-  setwd('C:/Users/natha/Desktop/Polling Places/data')
+  setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
   write.csv(temp, paste0('poll_struct_gov',names(poll_struct_dfs)[i],'.csv'))
   #Rename dataframe
   assign(paste0('poll_struct_gov',names(poll_struct_dfs)[i]),temp)
