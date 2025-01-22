@@ -281,7 +281,7 @@ common_covars <-c(
   'known_religious','CommercialData_LikelyUnion', 
   'CommercialData_OccupationGroup'
 )
-## Factor variables
+## Factorize variables
 #location categories
 model_data$location_category<-as.factor(model_data$location_category)
 model_data$location_category<-relevel(model_data$location_category, ref='other')
@@ -293,6 +293,8 @@ model_data$Parties_Description <- as.factor(model_data$Parties_Description)
 model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
 #religious
 model_data$known_religious<-as.factor(model_data$known_religious)
+#catholic
+model_data$known_catholic<-as.factor(model_data$known_catholic)
 #child present
 model_data$has_child<-as.factor(model_data$has_child)
 #government employee
@@ -391,48 +393,66 @@ blank_pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vot
                      image_name = paste0('Pred_Prob_child_school_',year,'_V3_blank'))
 
 
-##### Probability of Voting, if gov employee and is voting at gov building
-#vars
-## Create Location dummy variables
-model_data$pub_loc<-model_data$location_category=='public'
-model_data$pub_loc <- as.factor(model_data$pub_loc)
-## interaction
-ind_vars_gov_emp <-c(
-  # var of interest
-  'known_gov_emp*pub_loc',
-  common_covars[! common_covars %in% c('CommercialData_OccupationIndustry')]
-)
-# model
-m_gov<-log_reg(model_data, dep_var, ind_vars_gov_emp)
-summary(m_gov)
-#save results
-#write_summ(results_dir, paste0('gov_employees_',year,'_V3'), m_gov)
-## Calculate and plot predicted probabilities
-gov_pred<-predict_response(m_gov, terms=c('known_gov_emp','pub_loc'), margin='marginalmeans')
-#plot predicted probabilities
-pred_prob_plot(model_data=model_data, dep_var=dep_var, gov_pred, mean_vote = mean_turnout,
-               plot_title = paste0(year,' Probability of Voting of (Non-)Government Employees at Public Locations'),
-               xlab='Is a Government Employee', x_axis_labels = c('FALSE', 'TRUE'),
-               legend_exist=T, legend_title ='Votes at a Public Building', 
-               angle=0,legend_position = 'right', output_dir = plot_dir, 
-               image_name = paste0('Pred_Prob_govemp_pub_',year,'_V3'))
-
-### Probability of Voting, if known_religious at building type
+### Probability of Voting, if Catholic at a Catholic Building
 ##religious location dummy var
-model_data$relig_loc <- (model_data$location_category=='religious'|model_data$location_category=='religious_school')
-model_data$relig_loc <- as.factor(model_data$relig_loc)
+model_data$cath_loc <- (model_data$location_category=='catholic_church'|model_data$location_category=='catholic_school')
+model_data$cath_loc <- as.factor(model_data$cath_loc)
 ## create interaction terms
-category<-c('relig_loc')
-interactions<-paste('known_religious*',category, sep='')
-## remove religion variable
+category<-c('cath_loc')
+interactions<-paste('known_catholic*',category, sep='')
+## remove known religious variable
 relig_covars<-common_covars[! common_covars %in% c('known_religious')]
 ## run models and plot results
 log_reg_inter_plus_plot(model_data,dep_var=dep_var, 
                         interaction_terms=interactions, ind_vars = relig_covars,
                         turnout = turnout,
-                        x_label='Known Religious',x_axis_labels=c('FALSE','TRUE'),
+                        x_label='Catholic',x_axis_labels=c('FALSE','TRUE'),
                         loc_dict = loc_dict, var_dict=var_dict,
                         results_dir= results_dir, image_dir=plot_dir)
 
+
+# ### Probability of Voting, if known_religious at building type
+# ##religious location dummy var
+# model_data$relig_loc <- (model_data$location_category=='religious'|model_data$location_category=='religious_school')
+# model_data$relig_loc <- as.factor(model_data$relig_loc)
+# ## create interaction terms
+# category<-c('relig_loc')
+# interactions<-paste('known_religious*',category, sep='')
+# ## remove religion variable
+# relig_covars<-common_covars[! common_covars %in% c('known_religious')]
+# ## run models and plot results
+# log_reg_inter_plus_plot(model_data,dep_var=dep_var, 
+#                         interaction_terms=interactions, ind_vars = relig_covars,
+#                         turnout = turnout,
+#                         x_label='Known Religious',x_axis_labels=c('FALSE','TRUE'),
+#                         loc_dict = loc_dict, var_dict=var_dict,
+#                         results_dir= results_dir, image_dir=plot_dir)
+
+
+# ##### Probability of Voting, if gov employee and is voting at gov building
+# #vars
+# ## Create Location dummy variables
+# model_data$pub_loc<-model_data$location_category=='public'
+# model_data$pub_loc <- as.factor(model_data$pub_loc)
+# ## interaction
+# ind_vars_gov_emp <-c(
+#   # var of interest
+#   'known_gov_emp*pub_loc',
+#   common_covars[! common_covars %in% c('CommercialData_OccupationIndustry')]
+# )
+# # model
+# m_gov<-log_reg(model_data, dep_var, ind_vars_gov_emp)
+# summary(m_gov)
+# #save results
+# #write_summ(results_dir, paste0('gov_employees_',year,'_V3'), m_gov)
+# ## Calculate and plot predicted probabilities
+# gov_pred<-predict_response(m_gov, terms=c('known_gov_emp','pub_loc'), margin='marginalmeans')
+# #plot predicted probabilities
+# pred_prob_plot(model_data=model_data, dep_var=dep_var, gov_pred, mean_vote = mean_turnout,
+#                plot_title = paste0(year,' Probability of Voting of (Non-)Government Employees at Public Locations'),
+#                xlab='Is a Government Employee', x_axis_labels = c('FALSE', 'TRUE'),
+#                legend_exist=T, legend_title ='Votes at a Public Building', 
+#                angle=0,legend_position = 'right', output_dir = plot_dir, 
+#                image_name = paste0('Pred_Prob_govemp_pub_',year,'_V3'))
 
 
