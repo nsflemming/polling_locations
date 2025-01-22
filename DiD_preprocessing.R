@@ -68,11 +68,11 @@ rm(hist_poll_2020)
 poll_2019<-read_add_year(data_dir, 'L2PA_votehist_VM2_19.csv',2019)
 poll_2018<-read_add_year(data_dir, 'L2PA_votehist_VM2_18.csv',2018)
 # Read in Religious census data
-setwd(data_dir)
-relig_census<-read_excel('2020_USRC_Group_Detail.xlsx', sheet = '2020 Group by County')
-# Read in distance to polling station data
-dist_data18<-read.csv('voterloc_pollloc_dist_2018.csv')
-dist_data19<-read.csv('voterloc_pollloc_dist_2019.csv')
+#setwd(data_dir)
+#relig_census<-read_excel('2020_USRC_Group_Detail.xlsx', sheet = '2020 Group by County')
+# Read in distance to polling station data (distance in degrees)
+dist_data18<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2018.csv'))
+dist_data19<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2019.csv'))
 
 ### read in voter demographic and address data
 ## remove county and precinct columns since that's in the voter history/polling location files
@@ -201,6 +201,7 @@ vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year,
                                    CommercialData_EstimatedHHIncomeAmount,
                                    Residence_Families_HHCount,has_child,
                                    Religions_Description,known_religious,
+                                   known_catholic,
                                    CommercialData_LikelyUnion,
                                    CommercialData_OccupationIndustry,
                                    CommercialData_OccupationGroup,
