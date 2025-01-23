@@ -5,10 +5,6 @@ library(dplyr)
 library(stringr) #string manipulation
 library(ggplot2) #plotting
 
-#read in poll locations
-setwd("C:/Users/natha/Desktop/Polling Places/data")
-poll<-read.csv('polllocation_and_structure16.csv')
-
 ############################## define function 
 # Function to create vector of places that contain a category word in their name
 pollnamegrepl<-function(words, index){
@@ -19,6 +15,11 @@ pollnamegrepl<-function(words, index){
   }
   index
 }
+
+####################### Main
+#read in poll locations
+setwd("C:/Users/natha/Desktop/Polling Places DiD/data")
+poll<-read.csv('polllocation_and_structure18.csv')
 
 #################### pre-clean
 #remove numbers from the beginning of location names
@@ -193,12 +194,15 @@ master_index<-master_index%>%
                                .default = 1))
 ## save copy of matrix
 setwd("C:/Users/natha/Desktop/Polling Places/data/Structures")
-write.csv(master_index, 'keyword_matrix.csv')
+#write.csv(master_index, 'keyword_matrix.csv')
 
 ############## merge poll and keyword index
-polltest<-cbind(poll, master_index)
+master_index<-read.csv(paste0(struct_dir,'\\keyword_matrix.csv'))
+poll_ind<-cbind(poll, master_index)
+# Remove X variables
+poll_ind<-select(poll_ind, -c('X','X.1'))
 #add in keyword codings conditionally
-polltest<-polltest%>%
+poll_ind<-poll_ind%>%
   mutate(location_category = case_when(mult_indx==1&is.na(location_category) ~ 'multiple',
                                        lib_indx==1&is.na(location_category) ~ 'library',
                                        gov_fire_indx==1&is.na(location_category) ~ 'public',
@@ -228,10 +232,10 @@ polltest<-polltest%>%
 ####### save to csv
 #set directory
 setwd('C:/Users/natha/Desktop/Polling Places/data')
-write.csv(polltest, 'polllocation_structure_and_keyword16.csv')
+write.csv(poll_ind, 'polllocation_structure_and_keyword16.csv')
 
 #plot categories
-ggplot(data=polltest, aes(x=location_category))+
+ggplot(data=poll_ind, aes(x=location_category))+
   geom_histogram(stat='count')
 
 
