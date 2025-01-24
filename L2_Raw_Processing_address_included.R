@@ -79,10 +79,10 @@ educ_to_ord <- function(data, educ_var, mapping){
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
-L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
-#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
+#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
+L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
 #L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
-year=2019
+year=2018
 
 # Set variable lists
 ## adjust as needed based on variable names in data
@@ -131,7 +131,7 @@ demog_vars17<-c('LALVOTERID', 'Voters_StateVoterID',
 # Read in data
 #L2demog<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', 
 #                     demog_vars17)
-L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', 
+L2demog<-get_L2_data(L2_dir, 'VM2--PA--2018-08-22-DEMOGRAPHIC.tab', 
                      demog_vars18)
 ## race estimates
 #setwd(race_data_dir)
@@ -219,6 +219,7 @@ L2demog$multiple <- L2demog$location_category=='multiple'
 L2demog$justice_loc <- (L2demog$location_category=='justice'|L2demog$location_category=='public_justice')
 L2demog$library<-L2demog$location_category=='library'
 L2demog$relig_school <- L2demog$location_category=='religious_school' 
+L2demog$catholic_school <- L2demog$location_category=='catholic_school' 
 
 ### Create known government employee dummy variable
 L2demog$known_gov_emp <- ifelse(L2demog$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
