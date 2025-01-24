@@ -4,9 +4,9 @@
 
 library(dplyr)
 library(stringr) #string manipulation
-library() #fuzzy matching church names
 
-#define functions
+
+############################################# functions
 
 ## create address from address components
 make_address <- function(data, num, direction, street, street_type, city,
@@ -93,6 +93,8 @@ get_educ_data <- function(dir, filenames){
   return(education)
 }
 
+
+
 ### ftype to structure type
 ###     fcode to structure (more specific category, w/in type)
 # 730: education
@@ -169,9 +171,6 @@ worship<-get_process_struct_data(struct_dir, 'All_Places_Of_Worship_HIFLD.csv',
                                  state_var='STATE', zip_var = "ZIP", 
                                  structure_name = 'religious')
 
-## Catholic Churches
-#catholic<-read.csv(paste0(struct_dir,'\\Cath_Dir_PA_Churches_1_20_2025.csv'))
-### incomplete addresses
 
 ## Catholic Schools
 cath_school<-read.csv(paste0(struct_dir,'/MSA_PA_Catholic_Schools_1_18_2025.csv'))
@@ -190,6 +189,8 @@ cath_school$address<-toupper(cath_school$address)
 cath_school$location_category<-'catholic_school'
 #### Trim
 cath_school<-select(cath_school, c('address', 'location_category'))
+### abbreviate street names
+cath_school$address<-str_replace_all(cath_school$address, rep_str)
 
 ## Education buildings
 educ_files<-c('Educational_Structures_NGDA_2023/Colleges_Universities_0.csv',
@@ -269,6 +270,8 @@ structures<-structures%>%
          library=as.numeric(str_detect(location_category, 'library')))
 #remove uncategorized structures?
 structures<-structures[complete.cases(structures),]
+## save a copy of structure categorization matrix
+#write.csv(structures, 'structure_matrix.csv')
 
 ############# merge
 ### put dataframes into a list
@@ -291,8 +294,6 @@ poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019
                #'2022'=poll_struct2022, '2023'=poll_struct2023
                )
 
-## save a copy of structure categorization matrix
-#write.csv(polltest, 'structure_matrix.csv')
 #location category count instead of location category to see what's multiple coded
 for(i in seq_along(poll_struct_dfs)){
   temp<-poll_struct_dfs[[i]]%>%
@@ -302,32 +303,36 @@ for(i in seq_along(poll_struct_dfs)){
     ungroup()
   ###### Create categories for multicategory locations
   ### change locations with multiple categories to 'multiple' as a default
+  ###   This removes catholic schools
   temp$location_category[temp$location_count>1]<-'multiple'
-  ###  Create police stations/townhalls and sunday schools flags
+  ###  Create police stations/townhalls and religious schools flags
   temp<-temp%>%
     # Group rows by polling location
     group_by(address, PrecinctCode)%>%
     # Sum flags for categories
     mutate(public_justice = sum(across(c(public,justice))),
-           religious_school = sum(across(c(religious,school))))%>%
+           religious_school = sum(across(c(religious,school,catholic_school))))%>%
     ungroup()
   ## Add to category variable
   temp$location_category[temp$public_justice>1]<-'public_justice'
   temp$location_category[temp$religious_school>1]<-'religious_school'
+  ## Add catholic schools back in
+  temp$location_category[temp$catholic_school>0]<-'catholic_school'
   
   #remove individual categories and location count
   temp<-subset(temp, select=-c(religious,school,public,justice,other,
                                #allegh_pub,
-                               library, public_justice, religious_school))
+                               library, public_justice, religious_school,
+                               catholic_school))
   #remove duplicates 
   temp<-unique(temp)
   ##(still have extra rows?)
   ####### save to csv
   #set directory
   setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
-  write.csv(temp, paste0('poll_struct_gov',names(poll_struct_dfs)[i],'.csv'))
+  write.csv(temp, paste0('poll_struct_govsource',names(poll_struct_dfs)[i],'.csv'))
   #Rename dataframe
-  assign(paste0('poll_struct_gov',names(poll_struct_dfs)[i]),temp)
+  #assign(paste0('poll_struct_gov',names(poll_struct_dfs)[i]),temp)
 }
 
 #calc missingness by checking which addresses are in structure list
