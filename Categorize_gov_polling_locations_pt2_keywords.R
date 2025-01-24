@@ -127,17 +127,19 @@ othr_wrds<-c('SENIOR', 'YOUTH','CHILD','OLDER ADULT','EARLY CHILDHOOD',
              'AGING','FOOD BANK')
 
 ## Combine all word vectors for categories that will be subsumed into other
-othr_wrds<-
+#othr_wrds<-
 
 ##################################################
 #set directories
-cat_dir <- 'C:/Users/natha/Desktop/Polling Places/data'
-poll_dir <- 'C:/Users/natha/Desktop/Polling Places/data/gov_poll_places'
-plot_dir <- "C:/Users/natha/Desktop/Polling Places/plots"
+cat_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data'
+poll_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places'
+plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
+struct_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/Structures'
 # get poll location data and process
-filenames<-c('poll_struct_govsource2018.csv', 'poll_struct_govsource2019.csv',
-             'poll_struct_govsource2020.csv', 'poll_struct_govsource2021.csv',
-             'poll_struct_govsource2022.csv', 'poll_struct_govsource2023.csv')
+filenames<-c('poll_struct_govsource2018.csv', 'poll_struct_govsource2019.csv'
+             #,'poll_struct_govsource2020.csv', 'poll_struct_govsource2021.csv',
+             #'poll_struct_govsource2022.csv', 'poll_struct_govsource2023.csv'
+             )
 for(file in filenames){
   assign(paste0('poll_loc',substr(file,22,25)),
          # clean location names, removing some leading numbers (why need this again?)
@@ -148,8 +150,10 @@ for(file in filenames){
          'Description')))
 }
 
-poll_dfs<-list('18'=poll_loc2018,'19'=poll_loc2019,'20'=poll_loc2020,'21'=poll_loc2021,
-            '22'=poll_loc2022,'23'=poll_loc2023)
+poll_dfs<-list('18'=poll_loc2018,'19'=poll_loc2019
+               #,'20'=poll_loc2020,'21'=poll_loc2021,
+            #'22'=poll_loc2022,'23'=poll_loc2023
+            )
 
 ############### create keyword indices
 for (i in 1:length(poll_dfs)){
@@ -223,10 +227,11 @@ master_index<-master_index%>%
   mutate(mult_indx = case_when(keyword_count == 0 ~ 0, keyword_count == 1 ~ 0,
                                .default = 1))
 ## save copy of matrix
-setwd("C:/Users/natha/Desktop/Polling Places/data/Structures")
-write.csv(master_index, 'keyword_matrix.csv')
+setwd("C:/Users/natha/Desktop/Polling Places DiD/data/Structures")
+#write.csv(master_index, 'keyword_matrix.csv')
 
 ############## merge poll and keyword index
+#master_index<-read.csv(paste0(struct_dir,'\\keyword_matrix.csv'))
 polltest<-cbind(poll_dfs[[i]], master_index)
 #add in keyword codings conditionally
 polltest<-polltest%>%
@@ -242,14 +247,16 @@ polltest<-polltest%>%
   select(!c(mult_indx,library,public,other,religious,school,other))
 
 
-#calc missingness by checking which addresses are in structure list
+#calc missingness
 #sum(is.na(polltest$location_category))/9156 #9.64% missing
 
 ####### save to csv
 #set directory
-setwd('C:/Users/natha/Desktop/Polling Places/data')
-write.csv(polltest, paste0('poll_struct_key_gov',names(poll_dfs[i]),'.csv'))
+setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
+write.csv(polltest, paste0('poll_struct_key_govsource',names(poll_dfs[i]),'.csv'))
 }
+
+
 
 #plot categories
 ggplot(data=polltest, aes(x=location_category))+
