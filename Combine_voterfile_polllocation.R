@@ -21,14 +21,15 @@ pad_code<-function(df, code_var,county_var, counties, code_length){
 ################## Main
 ### set directories
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
+FVE_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\FVE_csvs'
 ### set year
-year='2018'
+year='2019'
 
 ### read in processed voterfile
-VF<-read.csv(paste0(data_dir,'\\FVE_',year,'.csv'))
+VF<-read.csv(paste0(FVE_dir,'\\FVE_',year,'.csv'))
 
 ### read in poll location file
-poll<-read.csv(paste0(data_dir,'\\poll_struct_key_govsource',substring(year,3,4),'.csv'))
+poll<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource',substring(year,3,4),'.csv'))
 
 ### merge files on county name and precinct code
 ## modify VF codes to match patterns of polling location codes
