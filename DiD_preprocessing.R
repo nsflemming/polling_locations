@@ -44,7 +44,10 @@ create_most_prob_race_var<-function(data, race_vars){
 ### Original function to create indicator for most probable race
 most_prob_race<-function(data, race_vars){
   # remove rows with all missing race predictions
-  data <- data[complete.cases(data),]
+  firstcol = which(colnames(data)=="pred.whi")
+  lastcol = which(colnames(data)=="pred.oth")
+  data <- data[rowSums(is.na(data[,firstcol:lastcol]))<5,]
+  #data <- data[complete.cases(data),]
   # create column taking value of most probable race
   data <- mutate(data, pred_race = names(data[,race_vars])
                  [max.col(data[,race_vars])])
@@ -82,7 +85,6 @@ demog_addr_2018<-read.csv(paste0(data_dir,'\\L2PA_2018_address_in_18.csv'))%>%
 demog_addr_2019<-read.csv(paste0(data_dir,'\\L2PA_2019_address_in_19.csv'))%>%
   select(-c(X, County, Precinct, Voters_FIPS, pub_loc, pub_just,
             other, relig_loc, school, multiple, justice_loc, library, relig_school))
-
 #### Merge poll location data with voter demographic data on L2 voterid
 demog_addr_2018<-left_join(demog_addr_2018, poll_2018, by='LALVOTERID')
 demog_addr_2019<-left_join(demog_addr_2019, poll_2019, by='LALVOTERID')
@@ -96,7 +98,7 @@ demog_addr_2019<-left_join(demog_addr_2019, dist_data19, by='LALVOTERID')
 rm(dist_data18, dist_data19)
 
 #### rbind years together
-## make column names match (check that income variables are equivalent)
+## make column names and number match (check that income variables are equivalent)
 demog_addr_2018<-demog_addr_2018%>%
   rename(pred.whi=pred.whi_2018, pred.bla=pred.bla_2018, pred.his=pred.his_2018, 
          pred.asi=pred.asi_2018, pred.oth=pred.oth_2018)
@@ -110,7 +112,7 @@ poll_demog_addr_all<-rbind(demog_addr_2018, demog_addr_2019)
 #poll_demog_addr_all<-create_most_prob_race_var(poll_demog_addr_all,c("pred.whi","pred.bla","pred.his",
 #                                       "pred.asi","pred.oth"))
 poll_demog_addr_all<-most_prob_race(poll_demog_addr_all,c("pred.whi","pred.bla","pred.his",
-                                           "pred.asi","pred.oth") )
+                                           "pred.asi","pred.oth"))
 # remove data frames to free up memory
 rm(demog_addr_2018, demog_addr_2019)
 
