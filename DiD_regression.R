@@ -157,31 +157,128 @@ results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 # read in two-time period data
 setwd(data_dir)
-two_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
+#two_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
+model_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
 
-# create a time period version of year
-two_data$time_period<-two_data$year-2018
+
+## Recode extraneous parties to 'other'
+model_data$Parties_Description <- fct_collapse(model_data$Parties_Description, 
+                                               Other = c('American', 'American Independent','Anarchist','Bull Moose',
+                                                         'Christian','Communist','Conservative','Constitution',
+                                                         'Constitutional','Consumer','Federalist','Free Choice',
+                                                         'Freedom','Green','Independence','Independent Democrat',
+                                                         'Independent Republican','Labor','Liberal',
+                                                         'Libertarian','Natural Law','Non-Partisan','Patriot',
+                                                         'Peace and Freedom','Populist','Progressive','Prohibition','Rainbow',
+                                                         'Reform','Registered Independent','Right to Life',
+                                                         'Social Democrat','Socialist','Socialist Labor',
+                                                         'Taxpayers','Unknown','Whig'))
+model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
+
+## create vector of location categories
+#categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
+#              'justice_loc','library','relig_school')
+## Create vector of location category labels
+loc_labels_NAsettoOther<-c('Other','Justice Location','Library','Multiple Categories',
+                           'Public Location','Public/Justice Location','Religious Location',
+                           'Religious School','School')
+loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
+                           'Public Location','Public/Justice Location','Religious Location',
+                           'Religious School','School')
+## Create dictionary of location labels
+loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
+            'other'='Other','relig_loc'='Religious Location','school'='School',
+            'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
+            'library'='Library', 'relig_school'='Religious School',
+            'catholic_school'='Catholic School','catholic_church'='Catholic Church',
+            'cath_loc'='Catholic Location')
+## Create dictionary of variable labels
+var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
+            'CommercialData_EstimatedHHIncomeAmount'='Estimated HH Income',
+            'Residence_Families_HHCount'='HH Resident Count',
+            'known_religious'='Known Religious',
+            'CommercialData_LikelyUnion'='Likely Union Member', 
+            'CommercialData_OccupationIndustry'='Occupation Industry',
+            'CommercialData_OccupationIndustry'='Occupation Group',
+            'has_child'='Has Child(ren)','known_gov_emp'='Known Government Employee',
+            'Parties_Description'='Political Party','pred_race'='Predicted Race',
+            'Shape_Length'='Distance to Polling Station','known_catholic'='Known Catholic')
+
+## Calculate years registered based on dependent variable year
+model_data$years_reg<-2018-as.numeric(model_data$year_reg)
+
+## Common set of covariates
+common_covars <-c(
+  # Demographics
+  'Voters_Gender', 'Voters_Age', 'Parties_Description',
+  'pred_race',
+  'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+  'known_religious','CommercialData_LikelyUnion', 
+  'CommercialData_OccupationGroup',
+  'Shape_Length',
+  'years_reg'
+)
+## Create simplified location categories variable (subsume catholic into religious)
+# model_data$location_category_simpl<-model_data$location_category
+# model_data$location_category_simpl[model_data$location_category_simpl=='catholic_church']<-'religious'
+# model_data$location_category_simpl[model_data$location_category_simpl=='catholic_school']<-'religious_school'
+
+## set how 'other category is treated
+#other_cond='default'
+other_cond='OtherSettoNA'
+#other_cond='NASettoOther'
+#loc_labels=loc_labels_NAsettoOther
+loc_labels=loc_labels_OthersettoNA
+## recode missing or other
+#model_data$location_category[is.na(model_data$location_category)]<-'other'
+model_data$location_category[model_data$location_category=='other']<-NA
+
+## Factorize variables
+#location categories
+model_data$location_category<-as.factor(model_data$location_category)
+#model_data$location_category<-relevel(model_data$location_category, ref='other')
+model_data$location_category<-relevel(model_data$location_category, ref='multiple')
+
+#race
+model_data$pred_race <- as.factor(model_data$pred_race)
+model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi")
+#political party
+model_data$Parties_Description <- as.factor(model_data$Parties_Description)
+model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
+#religious
+model_data$known_religious<-as.factor(model_data$known_religious)
+#catholic
+model_data$known_catholic<-as.factor(model_data$known_catholic)
+#child present
+model_data$has_child<-as.factor(model_data$has_child)
+#government employee
+#model_data$known_gov_emp <- ifelse(model_data$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
+#model_data$known_gov_emp<-as.factor(model_data$known_gov_emp)
+#union member
+model_data$CommercialData_LikelyUnion<-as.factor(model_data$CommercialData_LikelyUnion)
+#occupational group
+model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
+model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
 
 ### create indicators for ever being treated
 #two_data<-two_data%>%
-two_data<-two_data%>%
+two_data<-model_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
-  mutate(#ever_changed_precinct=sum(changed_prec), #300,838 cases (2%)
-         #ever_no_move_new_precinct=sum(no_move_new_precinct), #367,478 cases (3%)
-         #ever_moved_new_precinct=sum(moved_new_precinct),#66,640 cases (0.5%)
-         ever_changed_poll_cat=(sum(changed_poll_cat)>0),
-         ever_changed_poll_loc=(sum(changed_poll_loc)>0),
-         ever_moved_new_poll_cat=(sum(moved_new_poll_cat)>0),
-         ever_no_move_new_poll_cat=(sum(no_move_new_poll_cat)>0),
-         ever_moved_old_poll_cat=(sum(moved_old_poll_cat)>0),
+  mutate(ever_changed_poll_loc=(sum(changed_poll_loc)>0),
          ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
          ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0),
          ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0))%>% 
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
-  mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))%>%
-  ungroup()
+  mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)),
+         ## Calculate years registered by 2018
+         years_reg = 2018-as.numeric(year_reg))%>%
+  ungroup()%>%
+  #remove duplicate voters (not sure where they came from)
+  distinct(LALVOTERID, year, .keep_all = T)
+#set missing voted to 0?
+#two_data$voted[is.na(two_data$voted)]<-F
 
 ###### Split location category into years
 two_data$location_category_2018<-two_data$location_category
@@ -226,140 +323,22 @@ no_chng_or_no_mv_two_data<-two_data%>%
 ########################### subsets for general knowledge tests 
 ### people who changed polling location to a well known building 
 ecp_wellknown_two_data<-two_data%>%
-  # only people who have changed polling location w/o moving
+  # only people who have changed polling location
   filter(ever_changed_poll_loc==T)%>%
   group_by(LALVOTERID)%>%
   mutate(
     # new poll location is well known
     new_poll_wellknown = sum((((location_category=='library')|
                                  (location_category=='public')|
-                                 (location_category=='public_justice'))&
+                                 (location_category=='public_justice')
+                               |(location_category=='school')
+                               #|#(location_category=='relig_school')
+                               )&
                                 (year==2019)),na.rm=T)>0
   )%>%
   ungroup()
-
-### people who changed polling location to a well known building w/o moving 
-no_mv_wellknown_two_data<-two_data%>%
-  # only people who have changed polling location w/o moving
-  filter(ever_no_move_new_poll_loc==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # new poll location is well known
-    new_poll_wellknown = sum((((location_category=='library')|
-                                 (location_category=='public')|
-                                 (location_category=='public_justice'))&
-                                (year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling location to a well known building by moving 
-mv_wellknown_two_data<-two_data%>%
-  # only people who have changed polling location w/o moving
-  filter(ever_moved_new_poll_loc==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # new poll location is well known
-    new_poll_wellknown = sum((((location_category=='library')|
-                                 (location_category=='public')|
-                                 (location_category=='public_justice'))&
-                                (year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
+  
 ########################### subsets for specific knowledge tests 
-### people who changed polling station and their new station is a religious building
-ecp_relig_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only people who changed polling location to a/another religious building
-  filter(location_category_2019%in%c('religious',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter is religious
-    relig_new_poll_relig = sum(((known_religious==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station w/o moving and their new station is a religious building
-no_mv_relig_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_no_move_new_poll_loc==T)%>%
-  # only people who changed polling location to a/another religious building
-  filter(location_category_2019%in%c('religious',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter is religious
-    relig_new_poll_relig = sum(((known_religious==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station by moving and their new station is a religious building
-mv_relig_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_moved_new_poll_loc==T)%>%
-  # only people who changed polling location to a/another religious building
-  filter(location_category_2019%in%c('religious',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter is religious
-    relig_new_poll_relig = sum(((known_religious==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### religious people who changed polling station
-voters_relig_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only religious people
-  filter(known_religious==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # Whether new polling location is religious
-    relig_new_poll_relig = sum(((location_category=='religious')&(year==2019)),
-                               na.rm=T)>0
-  )%>%
-  ungroup()
-
-
-### people who changed polling station and their new station is a school
-ecp_school_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only people who changed polling location to a/another school
-  filter(location_category_2019%in%c('school',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter household has children
-    parent_new_poll_school = sum(((has_child==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station w/o moving and their new station is a school
-no_mv_school_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_no_move_new_poll_loc==T)%>%
-  # only people who changed polling location to a/another school
-  filter(location_category_2019%in%c('school',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter household has children
-    parent_new_poll_school = sum(((has_child==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station by moving and their new station is a school
-mv_school_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_moved_new_poll_loc==T)%>%
-  # only people who changed polling location to a/another school
-  filter(location_category_2019%in%c('school',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter household has children
-    parent_new_poll_school = sum(((has_child==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
 ### Parents who changed polling station
 voters_parents_two_data<-two_data%>%
   # only people who have changed polling location
@@ -374,59 +353,20 @@ voters_parents_two_data<-two_data%>%
   )%>%
   ungroup()
 
-### people who changed polling station and their new station is a public building
-ecp_public_two_data<-two_data%>%
+
+### catholic people who changed polling station
+voters_cath_two_data<-two_data%>%
   # only people who have changed polling location
   filter(ever_changed_poll_loc==T)%>%
-  # only people who changed polling location to a/another public building
-  filter(((location_category_2019%in%c('public',NA))|(location_category_2019%in%c('public_justice',NA))))%>%
+  # only religious people
+  filter(known_catholic==T)%>%
   group_by(LALVOTERID)%>%
   mutate(
-    # voter is a civil servant
-    govemp_new_poll_public = sum(((CommercialData_OccupationIndustry=='Civil Servant')
-                                  &(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station w/o moving and their new station is a public building
-no_mv_public_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_no_move_new_poll_loc==T)%>%
-  # only people who changed polling location to a/another school
-  filter(location_category_2019%in%c('public','public_justice',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter is a civil servant
-    govemp_new_poll_public = sum(((CommercialData_OccupationIndustry=='Civil Servant')
-                                  &(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station by moving and their new station is a school
-mv_public_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_moved_new_poll_loc==T)%>%
-  # only people who changed polling location to a/another school
-  filter(location_category_2019%in%c('public','public_justice',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter is a civil servant
-    govemp_new_poll_public = sum(((CommercialData_OccupationIndustry=='Civil Servant')
-                                  &(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### civil servants who changed polling station
-voters_govemp_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only parents
-  filter(CommercialData_OccupationIndustry=='Civil Servant')%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # Whether new polling location is a public building
-    govemp_new_poll_public = sum(((location_category%in%c('public','public_justice'))
-                                  &(year==2019)),na.rm=T)>0
+    # Whether new polling location is catholic
+    cath_new_poll_cath = sum((((location_category=='catholic_church')|
+                                 (location_category=='catholic_school'))&
+                                (year==2019)),
+                               na.rm=T)>0
   )%>%
   ungroup()
 
@@ -441,84 +381,149 @@ voters_govemp_two_data<-two_data%>%
 
 ever_chng_loc <- c("ever_changed_poll_loc","ever_moved_new_poll_loc",
               'ever_no_move_new_poll_loc','ever_moved_old_poll_loc')
-ever_chng_cat<-c('ever_changed_poll_cat','ever_moved_new_poll_cat',
-              'ever_no_move_new_poll_cat','ever_moved_old_poll_cat')
-chng_to<-c('changed_to_relig','changed_to_school','changed_to_public',
-           'changed_to_wellknown',
-           'relig_changed_to_relig','parent_changed_to_school','govemp_changed_to_public') 
-new_poll<-c('new_poll_relig','relig_new_poll_relig','new_poll_school','parent_new_poll_school',
-           'new_poll_public','govemp_new_poll_public','new_poll_wellknown')
+chng_to<-c('changed_to_school','changed_to_cath','changed_to_wellknown',
+           'parent_changed_to_school','cath_changed_to_cath') 
+new_poll<-c('new_poll_school','parent_new_poll_school','new_poll_cath','cath_new_poll_cath',
+           'new_poll_wellknown')
 
 ############ Convert treatment indicators to numeric
 two_data['ever_changed_poll_loc'] <- sapply(two_data['ever_changed_poll_loc'],as.numeric)
-reason<-c('ever_moved_new_poll_loc','ever_no_move_new_poll_loc')
-ecp_two_data[reason] <- sapply(ecp_two_data[reason],as.numeric)
-no_chng_or_mv_two_data['ever_moved_new_poll_loc']<- 
+# reason<-c('ever_moved_new_poll_loc','ever_no_move_new_poll_loc')
+# ecp_two_data[reason] <- sapply(ecp_two_data[reason],as.numeric)
+no_chng_or_mv_two_data['ever_moved_new_poll_loc']<-
   sapply(no_chng_or_mv_two_data['ever_moved_new_poll_loc'],as.numeric)
-no_chng_or_no_mv_two_data['ever_no_move_new_poll_loc']<- 
+no_chng_or_no_mv_two_data['ever_no_move_new_poll_loc']<-
   sapply(no_chng_or_no_mv_two_data['ever_no_move_new_poll_loc'],as.numeric)
 
 ecp_wellknown_two_data['new_poll_wellknown']<- sapply(ecp_wellknown_two_data['new_poll_wellknown'],as.numeric)
-no_mv_wellknown_two_data['new_poll_wellknown']<- sapply(no_mv_wellknown_two_data['new_poll_wellknown'],as.numeric)
-mv_wellknown_two_data['new_poll_wellknown']<- sapply(mv_wellknown_two_data['new_poll_wellknown'],as.numeric)
+ecp_wellknown_two_data$voted<-as.numeric(ecp_wellknown_two_data$voted)
 
-ecp_school_two_data['parent_new_poll_school'] <- sapply(ecp_school_two_data['parent_new_poll_school'],as.numeric)
-no_mv_school_two_data['parent_new_poll_school'] <- sapply(no_mv_school_two_data['parent_new_poll_school'],as.numeric)
-mv_school_two_data['parent_new_poll_school'] <- sapply(mv_school_two_data['parent_new_poll_school'],as.numeric)
 voters_parents_two_data['parent_new_poll_school'] <- sapply(voters_parents_two_data['parent_new_poll_school'],as.numeric)
+voters_parents_two_data$voted<-as.numeric(voters_parents_two_data$voted)
 
-ecp_relig_two_data['relig_new_poll_relig'] <- sapply(ecp_relig_two_data['relig_new_poll_relig'],as.numeric)
-no_mv_relig_two_data['relig_new_poll_relig'] <- sapply(no_mv_relig_two_data['relig_new_poll_relig'],as.numeric)
-mv_relig_two_data['relig_new_poll_relig'] <- sapply(mv_relig_two_data['relig_new_poll_relig'],as.numeric)
-voters_relig_two_data['relig_new_poll_relig'] <- sapply(voters_relig_two_data['relig_new_poll_relig'],as.numeric)
-
-ecp_public_two_data['govemp_new_poll_public'] <- sapply(ecp_public_two_data['govemp_new_poll_public'],as.numeric)
-no_mv_public_two_data['govemp_new_poll_public'] <- sapply(no_mv_public_two_data['govemp_new_poll_public'],as.numeric)
-mv_public_two_data['govemp_new_poll_public'] <- sapply(mv_public_two_data['govemp_new_poll_public'],as.numeric)
-voters_govemp_two_data['govemp_new_poll_public'] <- sapply(voters_govemp_two_data['govemp_new_poll_public'],as.numeric)
+voters_cath_two_data['cath_new_poll_cath'] <- sapply(voters_cath_two_data['cath_new_poll_cath'],as.numeric)
+voters_cath_two_data$voted<-as.numeric(voters_cath_two_data$voted)
 
 #mini<-ecp_two_data[order(ecp_two_data$LALVOTERID),]
 #mini<-mini[1:1000,]
 
-for(col in reason){
-  print(col)
-  out0 <- drdid(yname = "voted", #outcome
-                dname = col, #treatment group 
-                idname = "VOTERID", #respondent
-                tname = "year",
-                #xformla = ~Voters_Gender, 
-                data = ecp_two_data)
-  out0
-  # save model summary
-  setwd(results_dir)
-  sink(paste0(col,"_ecp_subset_DRDiD_model_summary.txt"))
-  print(out0)
-  sink()
-}
+# for(col in reason){
+#   print(col)
+#   out0 <- drdid(yname = "voted", #outcome
+#                 dname = col, #treatment group 
+#                 idname = "VOTERID", #respondent
+#                 tname = "year",
+#                 #xformla = ~Voters_Gender, 
+#                 data = ecp_two_data)
+#   out0
+#   # save model summary
+#   setwd(results_dir)
+#   sink(paste0(col,"_ecp_subset_DRDiD_model_summary.txt"))
+#   print(out0)
+#   sink()
+# }
 
-use_data=voters_govemp_two_data
-dvar<-'govemp_new_poll_public'
-out0 <- drdid(yname = "voted", #outcome
+#### DiD Regression
+dvar<-'ever_changed_poll_loc'
+# remove missing to prevent different length Y1 and Y0
+mini<-two_data%>%
+  select(all_of(c('voted',dvar,'LALVOTERID','VOTERID','year'
+           ,'Voters_Gender'
+           ,'Voters_Age','Parties_Description','pred_race',
+           'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+           'known_religious','CommercialData_LikelyUnion','CommercialData_OccupationGroup',
+           'years_reg'
+           )))%>%
+  filter(complete.cases(.))%>%
+  #filter out voters who aren't in both 2018 and 2019?
+  group_by(LALVOTERID)%>%
+  filter(length(year)==2)%>%
+  ungroup()
+
+# fix covariates at 2018 values
+mini<-mini%>%
+  group_by(LALVOTERID)%>%
+  mutate(Voters_Gender=Voters_Gender[year==2018],
+         Voters_Age=Voters_Age[year==2018],
+         Parties_Description=Parties_Description[year==2018],
+         pred_race=pred_race[year==2018],
+         CommercialData_EstimatedHHIncomeAmount=CommercialData_EstimatedHHIncomeAmount[year==2018],
+         Residence_Families_HHCount=Residence_Families_HHCount[year==2018],
+         known_religious=known_religious[year==2018],
+         CommercialData_LikelyUnion=CommercialData_LikelyUnion[year==2018],
+         CommercialData_OccupationGroup=CommercialData_OccupationGroup[year==2018],
+         years_reg=years_reg[year==2018])%>%
+  ungroup()
+
+out1 <- drdid(yname = "voted", #outcome
               dname = dvar, #treatment group
               idname = "VOTERID", #respondent
               tname = "year",
-              xformla = ~1,
-              data = use_data)
-out0
+              xformla = ~Voters_Gender+Voters_Age+Parties_Description+pred_race+
+                CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                known_religious+CommercialData_LikelyUnion+CommercialData_OccupationGroup+
+                years_reg,
+              data = mini)
+out1
 ## save model summary
-# setwd(results_dir)
-# sink(paste0(dvar,"_no_chng_or_no_mv_DRDiD_model_summary.txt"))
-# print(out0)
-# sink()
+setwd(results_dir)
+sink(paste0(dvar,'_DRDiD_matched_on_covars_',other_cond,'model_summary.txt'))
+print(out1)
+sink()
 
 # plot results
-title = 'ATET of Changing Polling Location to a \nPublic Building vs. Non-Public Building \nfor the Public Employees'
-groups = c('Non-Public Building', 'Parallel Trend', 'Public Building')
-plot_did(data=use_data, did_model=out0, dvar=dvar, 
+title = 'ATET of Changing Polling Location to a \nCatholic Church vs. Another Building for Catholics'
+groups = c('Non-Catholic Church', 'Parallel Trend', 'Catholic Church')
+plot_did(data=mini, did_model=out1, dvar=dvar, 
          plot_title=title,
          group1=groups[1], group2=groups[2],group3=groups[3])
 # blank plot
-blank_plot_did(data=use_data, did_model=out0, dvar=dvar, 
-               plot_title=title,
-               group1=groups[1], group2=groups[2],group3=groups[3])
+# blank_plot_did(data=use_data, did_model=out0, dvar=dvar, 
+#                plot_title=title,
+#                group1=groups[1], group2=groups[2],group3=groups[3])
 
+
+######################### Multiperiod
+library(did)
+
+#### Event study
+#reformat data for multi periods (1 row per year from 2016 to 2019)
+gvar<-'cath_new_poll_cath'
+mini<-voters_cath_two_data%>%
+  select(c('General_2016_11_08','General_2017_11_07','General_2018_11_06',
+           'General_2019_11_05',
+           'voted',gvar,'LALVOTERID','VOTERID','year'
+           #covariates
+           ,'Voters_Gender'
+           ,'Voters_Age','Parties_Description','pred_race',
+           'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+           #'known_religious',
+           'CommercialData_LikelyUnion','CommercialData_OccupationGroup',
+           'years_reg'))%>%
+  mutate(cath_new_poll_cath=ifelse(cath_new_poll_cath==1,2019,0))%>%
+  rowwise() %>%
+  slice(rep(1, 2)) %>%
+  group_by(LALVOTERID) %>%
+  mutate(year = seq(2016, by = 1, length.out = n()),
+         voted = ((year==2016 & General_2016_11_08==1)|(year==2017 & General_2017_11_07==1)|
+                    (year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))
+
+did.att.gt <- att_gt(yname = "voted",
+                     tname = "year",
+                     idname = "VOTERID",
+                     gname = gvar,
+                     xformla = ~Voters_Gender+Voters_Age+Parties_Description+pred_race+
+                       CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                       #known_religious+
+                       CommercialData_LikelyUnion+CommercialData_OccupationGroup+
+                       years_reg,
+                     data = mini
+)
+summary(did.att.gt)
+## save model summary
+setwd(results_dir)
+sink(paste0(gvar,'_mpdid_matched_on_covars_',other_cond,'model_summary.txt'))
+print(did.att.gt)
+sink()
+# plot them
+ggdid(did.att.gt)
