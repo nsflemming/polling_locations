@@ -25,7 +25,7 @@ calc_turnout_treated_control<-function(data,treatment_var){
                      names_to='election', values_to='voted')
   pd_t<-pd_t%>%
     group_by(election)%>%
-    summarize(turnout=sum(voted)/n())%>%
+    summarize(turnout=sum(voted, na.rm=T)/n())%>%
     mutate(time_period=case_when(election=='General_2016_11_08'~2016,
                                  election=='General_2017_11_07'~2017,
                                  election=='General_2018_11_06'~2018,
@@ -40,7 +40,7 @@ calc_turnout_treated_control<-function(data,treatment_var){
                      names_to='election', values_to='voted')
   pd_c<-pd_c%>%
     group_by(election)%>%
-    summarize(turnout=sum(voted)/n())%>%
+    summarize(turnout=sum(voted, na.rm=T)/n())%>%
     mutate(time_period=case_when(election=='General_2016_11_08'~2016,
                                  election=='General_2017_11_07'~2017,
                                  election=='General_2018_11_06'~2018,
@@ -76,8 +76,9 @@ results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 # read in data
 setwd(data_dir)
-model_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
+#model_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
 #model_data<-read.csv('DiD_prepped_loc_vote_16to18.csv')
+model_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
 
 ## ID
 model_data$VOTERID<-str_sub(model_data$LALVOTERID, 6, nchar(model_data$LALVOTERID))
@@ -109,92 +110,33 @@ model_data$location_category_2019[model_data$year==2018]<-NA
 ### people who changed polling location for whatever reason
 ecp_model_data<-model_data%>%
   filter(ever_changed_poll_loc==T)
+
 ### people who changed polling location by moving and people who didn't change location
 no_chng_or_mv_model_data<-model_data%>%
   filter(((ever_moved_new_poll_loc==T)|(ever_changed_poll_loc==F))&(ever_no_move_new_poll_loc==F))
+
 ### people who changed polling location by moving and people who didn't change location
 no_chng_or_no_mv_model_data<-model_data%>%
   filter(((ever_no_move_new_poll_loc==T)|(ever_changed_poll_loc==F))&(ever_moved_new_poll_loc==F))
+
 ########################### subsets for general knowledge tests 
 ### people who changed polling location to a well known building 
 ecp_wellknown_model_data<-model_data%>%
-  # only people who have changed polling location w/o moving
+  # only people who have changed polling location
   filter(ever_changed_poll_loc==T)%>%
   group_by(LALVOTERID)%>%
   mutate(
     # new poll location is well known
     new_poll_wellknown = sum((((location_category=='library')|
                                  (location_category=='public')|
-                                 (location_category=='public_justice'))&
-                                (year==2019)),na.rm=T)>0
+                                 (location_category=='public_justice')
+                               |(location_category=='school')
+                               #|#(location_category=='relig_school')
+    )&
+      (year==2019)),na.rm=T)>0
   )%>%
   ungroup()
-### people who changed polling location to a well known building w/o moving 
-no_mv_wellknown_model_data<-model_data%>%
-  # only people who have changed polling location w/o moving
-  filter(ever_no_move_new_poll_loc==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # new poll location is well known
-    new_poll_wellknown = sum((((location_category=='library')|
-                                 (location_category=='public')|
-                                 (location_category=='public_justice'))&
-                                (year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-### people who changed polling location to a well known building by moving 
-mv_wellknown_model_data<-model_data%>%
-  # only people who have changed polling location w/o moving
-  filter(ever_moved_new_poll_loc==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # new poll location is well known
-    new_poll_wellknown = sum((((location_category=='library')|
-                                 (location_category=='public')|
-                                 (location_category=='public_justice'))&
-                                (year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-### people who changed polling station and their new station is a religious building
-ecp_relig_model_data<-model_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only people who changed polling location to a/another religious building
-  filter(location_category_2019%in%c('religious',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter is religious
-    relig_new_poll_relig = sum(((known_religious==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station and their new station is a school
-ecp_school_model_data<-model_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only people who changed polling location to a/another school
-  filter(location_category_2019%in%c('school',NA))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter household has children
-    parent_new_poll_school = sum(((has_child==T)&(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-### people who changed polling station and their new station is a public building
-ecp_public_model_data<-model_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only people who changed polling location to a/another public building
-  filter(((location_category_2019%in%c('public',NA))|(location_category_2019%in%c('public_justice',NA))))%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # voter is a civil servant
-    govemp_new_poll_public = sum(((CommercialData_OccupationIndustry=='Civil Servant')
-                                  &(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
+########################### subsets for specific knowledge tests 
 ### Parents who changed polling station
 voters_parents_model_data<-model_data%>%
   # only people who have changed polling location
@@ -209,48 +151,65 @@ voters_parents_model_data<-model_data%>%
   )%>%
   ungroup()
 
-### religious people who changed polling station
-voters_relig_model_data<-model_data%>%
+
+### catholic people who changed polling station
+voters_cath_model_data<-model_data%>%
   # only people who have changed polling location
   filter(ever_changed_poll_loc==T)%>%
   # only religious people
-  filter(known_religious==T)%>%
+  filter(known_catholic==T)%>%
   group_by(LALVOTERID)%>%
   mutate(
-    # Whether new polling location is religious
-    relig_new_poll_relig = sum(((location_category=='religious')&(year==2019)),
-                               na.rm=T)>0
+    # Whether new polling location is catholic
+    cath_new_poll_cath = sum((((location_category=='catholic_church')|
+                                 (location_category=='catholic_school'))&
+                                (year==2019)),
+                             na.rm=T)>0
   )%>%
   ungroup()
 
-### civil servants who changed polling station
-voters_govemp_model_data<-model_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only parents
-  filter(CommercialData_OccupationIndustry=='Civil Servant')%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # Whether new polling location is a public building
-    govemp_new_poll_public = sum(((location_category%in%c('public','public_justice'))
-                                  &(year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
+############ Convert treatment indicators to numeric
+ever_chng_loc <- c("ever_changed_poll_loc","ever_moved_new_poll_loc",
+                   'ever_no_move_new_poll_loc','ever_moved_old_poll_loc')
+chng_to<-c('changed_to_school','changed_to_cath','changed_to_wellknown',
+           'parent_changed_to_school','cath_changed_to_cath') 
+new_poll<-c('new_poll_school','parent_new_poll_school','new_poll_cath','cath_new_poll_cath',
+            'new_poll_wellknown')
+reason<-c('ever_moved_new_poll_loc','ever_no_move_new_poll_loc')
 
+ecp_model_data['ever_changed_poll_loc'] <- sapply(ecp_model_data['ever_changed_poll_loc'],as.numeric)
+no_chng_or_mv_model_data['ever_moved_new_poll_loc']<- 
+  sapply(no_chng_or_mv_model_data['ever_moved_new_poll_loc'],as.numeric)
+no_chng_or_no_mv_model_data['ever_no_move_new_poll_loc']<- 
+  sapply(no_chng_or_no_mv_model_data['ever_no_move_new_poll_loc'],as.numeric)
+
+ecp_wellknown_model_data['new_poll_wellknown']<- sapply(ecp_wellknown_model_data['new_poll_wellknown'],as.numeric)
+ecp_wellknown_model_data$voted<-as.numeric(ecp_wellknown_model_data$voted)
+
+voters_parents_model_data['parent_new_poll_school'] <- sapply(voters_parents_model_data['parent_new_poll_school'],as.numeric)
+voters_parents_model_data$voted<-as.numeric(voters_parents_model_data$voted)
+
+voters_cath_model_data['cath_new_poll_cath'] <- sapply(voters_cath_model_data['cath_new_poll_cath'],as.numeric)
+voters_cath_model_data$voted<-as.numeric(voters_cath_model_data$voted)
+
+
+##################### Plot trends
 ## calculate turnout for treated and untreated groups
-plot_data<-calc_turnout_treated_control(voters_govemp_two_data, 'govemp_new_poll_public')
+plot_data<-calc_turnout_treated_control(no_chng_or_no_mv_model_data, 'ever_no_move_new_poll_loc')
+#plot_data_2pre<-plot_data%>%
+#  filter(time_period>2016)
 ## Plot Parallel trends
-ggplot(plot_data,aes(x=time_period,y=turnout,colour=govemp_new_poll_public)) +
+ggplot(plot_data,aes(x=time_period,y=turnout,colour=ever_no_move_new_poll_loc)) +
   geom_point(size=2)+
-  geom_line(aes(group = govemp_new_poll_public), linetype = 2, linewidth=0.75)+
+  geom_line(aes(group = ever_no_move_new_poll_loc), linetype = 2, linewidth=0.75)+
   geom_vline(xintercept=2018, alpha=0.25)+
   ylab("Turnout") +
   xlab("Year") +
-  ggtitle("Parallel Trends Plot: \nPublic Employees Who Changed Polling Location") +
+  ggtitle("Parallel Trends Plot: \nVoters Who Changed Polling Location Without Moving \nvs. Voters Who Didn't Change") +
   scale_x_continuous(breaks=seq(2016,2019,1))+
   #convert turnout to percentage
   scale_y_continuous(labels = scales::percent)+
-  scale_color_discrete(name="Changed Poll Location to a \nPublic Building",
+  scale_color_discrete(name="Changed Poll Location without Moving",
                         breaks=c(F, T),
                         labels=c("No", "Yes"))+
   theme_minimal()+
@@ -259,6 +218,71 @@ ggplot(plot_data,aes(x=time_period,y=turnout,colour=govemp_new_poll_public)) +
         axis.text = element_text(size=15),
         legend.title = element_text(size=18),
         legend.text =element_text(size=15))
+#PT_everchange_16_19
+#Parallel Trends Plot: \nVoters Who Changed Polling Location for Any Reason \nvs. Voters Who Didn't Change
+#Changed Poll Location 
+#PT_movedchng_16_19
+#Parallel Trends Plot: \nVoters Who Changed Polling Location by Moving \nvs. Voters Who Didn't Change
+#Changed Poll Location by Moving
+#PT_everchange_16_19
+#Parallel Trends Plot: \nVoters Who Changed Polling Location Without Moving \nvs. Voters Who Didn't Change
+#Changed Poll Location without Moving
+#PT_wellknown_16_19
+#"Parallel Trends Plot: \nRegistered Voters Who Changed Polling Location"
+#"Changed Poll Location to a \nWell-known Building"
+#PT_school_16_19
+#Parallel Trends Plot: \nParents Who Changed Polling Location to a School \nvs. a Non-School
+#Changed Poll Location to a \nSchool
+#PT_Catholic_16_19
+#Parallel Trends Plot: \nCatholics Who Changed Polling Location to a \n Catholic Church vs. Another Buildingl
+#Changed Poll Location to a \nCatholic Church
 
 
+######################### Pre-testing
+library(did)
 
+#### Event study
+#reformat data for multi periods
+gvar<-'new_poll_wellknown'
+mini<-ecp_wellknown_model_data%>%
+  select(c('General_2016_11_08','General_2017_11_07','General_2018_11_06',
+           'General_2019_11_05',
+           'voted',gvar,'LALVOTERID','VOTERID','year'
+           #covariates
+           ,'Voters_Gender'
+           ,'Voters_Age','Parties_Description','pred_race',
+           'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+           'known_religious','CommercialData_LikelyUnion','CommercialData_OccupationGroup',
+           'years_reg'))%>%
+  mutate(new_poll_wellknown=ifelse(new_poll_wellknown==1,2019,0))%>%
+  rowwise() %>%
+  slice(rep(1, 2)) %>%
+  group_by(LALVOTERID) %>%
+  mutate(year = seq(2016, by = 1, length.out = n()),
+         voted = ((year==2016 & General_2016_11_08==1)|(year==2017 & General_2017_11_07==1)|
+                    (year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))
+
+did.att.gt <- att_gt(yname = "voted",
+                     tname = "year",
+                     idname = "VOTERID",
+                     gname = gvar,
+                     xformla = ~Voters_Gender+Voters_Age+Parties_Description+pred_race+
+                       CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                       known_religious+CommercialData_LikelyUnion+CommercialData_OccupationGroup+
+                       years_reg,
+                     data = mini
+)
+summary(did.att.gt)
+# plot them
+ggdid(did.att.gt)
+
+###### Conditional parallel trends (didn't wait for it to finish)
+cdp <- conditional_did_pretest(yname = "voted",
+                               tname = "year",
+                               idname = "VOTERID",
+                               gname = gvar,
+                               xformla = ~Voters_Gender+Voters_Age+Parties_Description+pred_race+
+                                 CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                                 known_religious+CommercialData_LikelyUnion+CommercialData_OccupationGroup+
+                                 years_reg, 
+                               data = mini)
