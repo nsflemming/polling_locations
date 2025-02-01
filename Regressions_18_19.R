@@ -93,7 +93,7 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
                                              'CommercialData_OccupationIndustry'),
                                   turnout,
                                   x_label, x_axis_labels = c('FALSE','TRUE'), loc_dict, var_dict,
-                                  vjust_value=0, hjust_value=0,
+                                  vjust_value=0, hjust_value=0, image_name,
                                   results_dir, image_dir){
   for(interaction in interaction_terms){
     print(interaction)
@@ -110,13 +110,11 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
                                  margin='marginalmeans')
     #save results
     write_summ(results_dir, paste0(first_term,'x',second_term,
-                                   substr(dep_var,9,12),'_summary'), model)
+                                   substr(dep_var,9,12),'_summary','_',other_cond), model)
     # Generate plot details
     plot_title=paste0(substr(dep_var,9,12),' Probability of Voting for ', 
                       var_dict[first_term][[1]], ' at ', loc_dict[second_term][[1]])
     legend_title = loc_dict[second_term][[1]]
-    image_name = paste0('Pred_Prob_',first_term,'x',loc_dict[second_term][[1]],
-                        substr(dep_var,9,12),'_V3')
     pred_prob_plot(model_data=df, dep_var=dep_var, model_pred, mean_vote=turnout, 
                    plot_title=plot_title, dodge=0.8, xlab=x_label, 
                    x_axis_labels = x_axis_labels, ylab='Predicted Probability of Voting', 
@@ -224,6 +222,8 @@ plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 # read in data
 setwd(data_dir)
 model_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
+# set vers
+vers='V5'
 
 ## Recode extraneous parties to 'other'
 model_data$Parties_Description <- fct_collapse(model_data$Parties_Description, 
@@ -240,17 +240,22 @@ model_data$Parties_Description <- fct_collapse(model_data$Parties_Description,
 model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
 
 ## create vector of location categories
-categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
-              'justice_loc','library','relig_school')
+#categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
+#              'justice_loc','library','relig_school')
 ## Create vector of location category labels
-loc_labels<-c('Other','Justice Location','Library','Multiple Categories',
+loc_labels_NAsettoOther<-c('Other','Justice Location','Library','Multiple Categories',
+              'Public Location','Public/Justice Location','Religious Location',
+              'Religious School','School')
+loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
               'Public Location','Public/Justice Location','Religious Location',
               'Religious School','School')
 ## Create dictionary of location labels
 loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
             'other'='Other','relig_loc'='Religious Location','school'='School',
             'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
-            'library'='Library', 'relig_school'='Religious School')
+            'library'='Library', 'relig_school'='Religious School',
+            'catholic_school'='Catholic School','catholic_church'='Catholic Church',
+            'cath_loc'='Catholic Location')
 ## Create dictionary of variable labels
 var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
             'CommercialData_EstimatedHHIncomeAmount'='Estimated HH Income',
@@ -260,10 +265,24 @@ var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
             'CommercialData_OccupationIndustry'='Occupation Industry',
             'CommercialData_OccupationIndustry'='Occupation Group',
             'has_child'='Has Child(ren)','known_gov_emp'='Known Government Employee',
-            'Parties_Description'='Political Party','pred_race'='Predicted Race')
+            'Parties_Description'='Political Party','pred_race'='Predicted Race',
+            'Shape_Length'='Distance to Polling Station','known_catholic'='Known Catholic')
 
 
 #################### Logistic Regression
+##set dependent variable
+#dep_var = 'General_2018_11_06'
+dep_var = 'General_2019_11_05'
+year=substr(dep_var,9,12)
+year_num<-as.numeric(year)
+### calculate overall mean turnout for election for plotting
+sub_data<-model_data[model_data$year==year_num,]
+sub_data[[dep_var]][is.na(sub_data[[dep_var]])]<-0
+mean_turnout <- mean(sub_data[[dep_var]], na.rm=T)
+
+## Calculate years registered based on dependent variable year
+model_data$years_reg<-year_num-as.numeric(model_data$year_reg)
+
 ## Common set of covariates
 common_covars <-c(
   # Demographics
@@ -271,20 +290,34 @@ common_covars <-c(
   'pred_race',
   'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
   'known_religious','CommercialData_LikelyUnion', 
-  'CommercialData_OccupationGroup'
+  'CommercialData_OccupationGroup',
+  'Shape_Length',
+  'years_reg'
 )
-common_covars <-c(
-  # Demographics
-  'Voters_Gender', 'Voters_Age', 'Parties_Description',
-  'pred_race',
-  'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
-  'known_religious','CommercialData_LikelyUnion', 
-  'CommercialData_OccupationGroup'
-)
+## Create simplified location categories variable (subsume catholic into religious)
+model_data$location_category_simpl<-model_data$location_category
+model_data$location_category_simpl[model_data$location_category_simpl=='catholic_church']<-'religious'
+model_data$location_category_simpl[model_data$location_category_simpl=='catholic_school']<-'religious_school'
+
+## set how 'other category is treated
+other_cond='OtherSettoNA'
+loc_labels=loc_labels_OthersettoNA
+#other_cond='NASettoOther'
+## recode missing location category to other
+#model_data$location_category_simpl[is.na(model_data$location_category_simpl)]<-'other'
+#model_data$location_category[is.na(model_data$location_category)]<-'other'
+model_data$location_category_simpl[model_data$location_category_simpl=='other']<-NA
+model_data$location_category[model_data$location_category=='other']<-NA
+
 ## Factorize variables
 #location categories
+model_data$location_category_simpl<-as.factor(model_data$location_category_simpl)
 model_data$location_category<-as.factor(model_data$location_category)
-model_data$location_category<-relevel(model_data$location_category, ref='other')
+#model_data$location_category_simpl<-relevel(model_data$location_category_simpl, ref='other')
+#model_data$location_category<-relevel(model_data$location_category, ref='other')
+model_data$location_category_simpl<-relevel(model_data$location_category_simpl, ref='multiple')
+model_data$location_category<-relevel(model_data$location_category, ref='multiple')
+
 #race
 model_data$pred_race <- as.factor(model_data$pred_race)
 model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi")
@@ -298,22 +331,17 @@ model_data$known_catholic<-as.factor(model_data$known_catholic)
 #child present
 model_data$has_child<-as.factor(model_data$has_child)
 #government employee
-model_data$known_gov_emp <- ifelse(model_data$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
-model_data$known_gov_emp<-as.factor(model_data$known_gov_emp)
+#model_data$known_gov_emp <- ifelse(model_data$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
+#model_data$known_gov_emp<-as.factor(model_data$known_gov_emp)
 #union member
 model_data$CommercialData_LikelyUnion<-as.factor(model_data$CommercialData_LikelyUnion)
 #occupational group
 model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
 model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
 
-##set dependent variable
-#dep_var = 'General_2018_11_06'
-dep_var = 'General_2019_11_05'
-year=substr(dep_var,9,12)
-### calculate overall mean turnout for election for plotting
-data_2019<-model_data[model_data$year==2019,]
-data_2019$General_2019_11_05[is.na(data_2019$General_2019_11_05)]<-0
-mean_turnout <- mean(data_2019$General_2019_11_05, na.rm=T)
+
+
+### Calculate 
 #data removing missing race imputations
 ### Create race indicator for most probable race
 # most_prob_race<-function(data, race_vars){
@@ -328,17 +356,17 @@ mean_turnout <- mean(data_2019$General_2019_11_05, na.rm=T)
 #                                   "pred.oth"))
 
 ##### Probability of Voting, Location category as predictor
-ind_vars_loc<-c('location_category',common_covars)
+ind_vars_loc<-c('location_category_simpl',common_covars)
 # locations model
 m_base<-log_reg(model_data, dep_var, ind_vars_loc)
 summary(m_base)
 #save results
-#write_summ(results_dir, paste0('base_',year,'_V3'), m_base)
+write_summ(results_dir, paste0('base_',year,'_',vers,'_',other_cond), m_base)
 # calculate and plot predicted probabilities using Marginal Effect at the Means
 #   see ggeffects documentation for details, but numerical variables are set to the mean
 #   and effects for categorical variables are calculated  as a weighted average
 #   over the factor levels. Should come closer to sample 'average observation' 
-base_pred<-predict_response(m_base, terms='location_category', margin='marginalmeans',
+base_pred<-predict_response(m_base, terms='location_category_simpl', margin='marginalmeans',
                             rg.limit = 12000)
  #plot predicted probabilities
 pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean_turnout,
@@ -347,16 +375,16 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean
                legend_exist=F,legend_title =NULL, angle=45, hjust_value=1, 
                vjust_value=1,
                legend_position = 'right', output_dir = plot_dir, 
-               image_name = paste0('Pred_Prob_Location_categories_',year,'_V3'))
+               image_name = paste0('Pred_Prob_Location_categories_',year,'_',vers,'_',other_cond))
 # create blank plot
-blank_pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean_turnout,
-                     ymin=31.5,ymax=37,
-                     plot_title = paste0(year,' Probability of Voting at Each Category of Location'),
-                     dodge=0, xlab='Location Category', x_axis_labels = loc_labels,
-                     legend_exist=F,legend_title =NULL, angle=45, hjust_value=1, 
-                     vjust_value=1,
-                     legend_position = 'right', output_dir = plot_dir, 
-                     image_name = paste0('Pred_Prob_Location_categories_',year,'_V3_blank'))
+# blank_pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean_turnout,
+#                      ymin=31.5,ymax=37,
+#                      plot_title = paste0(year,' Probability of Voting at Each Category of Location'),
+#                      dodge=0, xlab='Location Category', x_axis_labels = loc_labels,
+#                      legend_exist=F,legend_title =NULL, angle=45, hjust_value=1, 
+#                      vjust_value=1,
+#                      legend_position = 'right', output_dir = plot_dir, 
+#                      image_name = paste0('Pred_Prob_Location_categories_',year,'_',vers,'_blank_',other_cond))
 
 ##### Probability of Voting, If has/lacks child and is voting at a school
 #vars
@@ -373,7 +401,7 @@ ind_vars_child_schl <-c(
 m_schl<-log_reg(model_data, dep_var, ind_vars_child_schl)
 summary(m_schl)
 #save results
-#write_summ(results_dir, paste0('school_',year,'_V3'), m_schl)
+write_summ(results_dir, paste0('school_',year,'_',vers,'_',other_cond), m_schl)
 ## Calculate and plot predicted probabilities
 schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='marginalmeans')
 #plot predicted probabilities
@@ -382,15 +410,15 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = me
                xlab='Has a Child/Children', x_axis_labels = c('FALSE', 'TRUE'),
                legend_exist=T, legend_title ='Votes at a School', angle=0,legend_position = 'right',
                output_dir = plot_dir, 
-               image_name = paste0('Pred_Prob_child_school_',year,'_V3'))
+               image_name = paste0('Pred_Prob_child_school_',year,'_',vers,'_',other_cond))
 # create blank plot
-blank_pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote=mean_turnout,
-                     ymin=31,ymax=34.75,
-                     plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations'),
-                     xlab='Has a Child/Children', x_axis_labels = c('FALSE', 'TRUE'),
-                     legend_exist=T,legend_title ='Votes at a School', angle=0, 
-                     legend_position = 'right', output_dir = plot_dir, 
-                     image_name = paste0('Pred_Prob_child_school_',year,'_V3_blank'))
+# blank_pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote=mean_turnout,
+#                      ymin=31,ymax=34.75,
+#                      plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations'),
+#                      xlab='Has a Child/Children', x_axis_labels = c('FALSE', 'TRUE'),
+#                      legend_exist=T,legend_title ='Votes at a School', angle=0, 
+#                      legend_position = 'right', output_dir = plot_dir, 
+#                      image_name = paste0('Pred_Prob_child_school_',year,'_',vers,'_blank_',other_cond))
 
 
 ### Probability of Voting, if Catholic at a Catholic Building
@@ -401,14 +429,16 @@ model_data$cath_loc <- as.factor(model_data$cath_loc)
 category<-c('cath_loc')
 interactions<-paste('known_catholic*',category, sep='')
 ## remove known religious variable
-relig_covars<-common_covars[! common_covars %in% c('known_religious')]
+cath_covars<-common_covars[! common_covars %in% c('known_religious')]
 ## run models and plot results
 log_reg_inter_plus_plot(model_data,dep_var=dep_var, 
-                        interaction_terms=interactions, ind_vars = relig_covars,
+                        interaction_terms=interactions, ind_vars = cath_covars,
                         turnout = turnout,
                         x_label='Catholic',x_axis_labels=c('FALSE','TRUE'),
                         loc_dict = loc_dict, var_dict=var_dict,
-                        results_dir= results_dir, image_dir=plot_dir)
+                        results_dir= results_dir, 
+                        image_name=paste0('Pred_Prob_Catholic_x_cath_loc',
+                                          year,'_',vers,'_',other_cond),image_dir=plot_dir)
 
 
 # ### Probability of Voting, if known_religious at building type
@@ -444,7 +474,7 @@ log_reg_inter_plus_plot(model_data,dep_var=dep_var,
 # m_gov<-log_reg(model_data, dep_var, ind_vars_gov_emp)
 # summary(m_gov)
 # #save results
-# #write_summ(results_dir, paste0('gov_employees_',year,'_V3'), m_gov)
+# #write_summ(results_dir, paste0('gov_employees_',year,'_V5'), m_gov)
 # ## Calculate and plot predicted probabilities
 # gov_pred<-predict_response(m_gov, terms=c('known_gov_emp','pub_loc'), margin='marginalmeans')
 # #plot predicted probabilities
@@ -453,6 +483,6 @@ log_reg_inter_plus_plot(model_data,dep_var=dep_var,
 #                xlab='Is a Government Employee', x_axis_labels = c('FALSE', 'TRUE'),
 #                legend_exist=T, legend_title ='Votes at a Public Building', 
 #                angle=0,legend_position = 'right', output_dir = plot_dir, 
-#                image_name = paste0('Pred_Prob_govemp_pub_',year,'_V3'))
+#                image_name = paste0('Pred_Prob_govemp_pub_',year,'_V5'))
 
 
