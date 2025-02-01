@@ -63,13 +63,15 @@ plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 ### read in vote history and poll location data
 ## adding year indicator
 hist_poll_2020<-read_add_year(data_dir, 'L2PA_votehist_VM2_20.csv',2020)
+hist_2019<-read_add_year(data_dir, 'L2PA_votehist_VM2_19.csv',2019)
 ### separate into polling location info and voting history
 #poll_2020<-hist_poll_2020%>%select(-c(General_2016_11_08, General_2017_11_07, General_2018_11_06, General_2019_11_05))
 hist_2020<-hist_poll_2020%>%select(c(LALVOTERID, General_2016_11_08, General_2017_11_07, General_2018_11_06, General_2019_11_05))
 rm(hist_poll_2020)
+
 # read in poll location data
-poll_2019<-read_add_year(data_dir, 'L2PA_votehist_VM2_19.csv',2019)
-poll_2018<-read_add_year(data_dir, 'L2PA_votehist_VM2_18.csv',2018)
+poll_2019<-read_add_year(data_dir, 'L2PA_poll_loc_VM2_19.csv',2019)
+poll_2018<-read_add_year(data_dir, 'L2PA_poll_loc_VM2_18.csv',2018)
 # Read in Religious census data
 #setwd(data_dir)
 #relig_census<-read_excel('2020_USRC_Group_Detail.xlsx', sheet = '2020 Group by County')
@@ -121,6 +123,18 @@ vote_poll_demog_addr_all<-left_join(poll_demog_addr_all, hist_2020, by='LALVOTER
 # remove data frames to free up memory
 rm(hist_2020, poll_demog_addr_all)
 
+### merge in 2018 election records from 2019 file to replace missings in 2020 file
+hist_2019<-select(hist_2019, c('LALVOTERID', 'General_2018_11_06'))
+vote_poll_demog_addr_all<-vote_poll_demog_addr_all%>%
+  # join on L2 voterid
+  inner_join(hist_2019, by='LALVOTERID')%>%
+  # coalesce to replace missing values
+  mutate(General_2018_11_06 = coalesce(General_2018_11_06.x, General_2018_11_06.y),
+         Voters_StateVoterID = coalesce(Voters_StateVoterID.x, Voters_StateVoterID.y))%>%
+  # remove duplicate variables
+  select(-c(General_2018_11_06.x, General_2018_11_06.y, X, Voters_StateVoterID.x, 
+            Voters_StateVoterID.y))
+
 ### Merge in religious census data on county name
 # filter religious data to just PA... 
 # relig_census<-relig_census%>%
@@ -150,12 +164,8 @@ vote_poll_demog_addr_all <- binarize_vote(vote_poll_demog_addr_all, 'General_201
 vote_poll_demog_addr_all<-vote_poll_demog_addr_all%>%
   group_by(LALVOTERID)%>%
   mutate(
-    ## set to TRUE when precinct doesn't match previous
-    #changed_prec = Precinct != lag(Precinct),
     ## set to TRUE when address doesn't match previous
     changed_address = (Residence_Addresses_AddressLine != lag(Residence_Addresses_AddressLine)),
-    ## set to TRUE when polling location category doesn't match previous
-    #changed_poll_cat = (location_category != lag(location_category)),
     ## set to TRUE when polling location address doesn't match previous
     changed_poll_loc = (Description != lag(Description))
     )%>%
@@ -168,21 +178,16 @@ vote_poll_demog_addr_all<-vote_poll_demog_addr_all%>%
   group_by(year)%>%
   mutate(
     ## set missing to FALSE (didn't change as far as we know)
-    #changed_prec = ifelse(is.na(changed_prec), F, changed_prec),
     changed_address = ifelse(is.na(changed_address), F, changed_address),
-    #changed_poll_cat = ifelse(is.na(changed_poll_cat), F, changed_poll_cat),
     changed_poll_loc = ifelse(is.na(changed_poll_loc), F, changed_poll_loc))%>%
   ungroup()
 # Create treatment indicators based on first indicators
-#vote_poll_demog_addr_all$moved_new_poll_cat=((vote_poll_demog_addr_all$changed_address==TRUE) & (vote_poll_demog_addr_all$changed_poll_cat==TRUE))
-#vote_poll_demog_addr_all$moved_old_poll_cat=((vote_poll_demog_addr_all$changed_address==TRUE) & (vote_poll_demog_addr_all$changed_poll_cat==FALSE))
-#vote_poll_demog_addr_all$no_move_new_poll_cat=((vote_poll_demog_addr_all$changed_address==FALSE) & (vote_poll_demog_addr_all$changed_poll_cat==TRUE))
 vote_poll_demog_addr_all$moved_new_poll_loc=((vote_poll_demog_addr_all$changed_address==TRUE) & (vote_poll_demog_addr_all$changed_poll_loc==TRUE))
 vote_poll_demog_addr_all$moved_old_poll_loc=((vote_poll_demog_addr_all$changed_address==TRUE) & (vote_poll_demog_addr_all$changed_poll_loc==FALSE))
 vote_poll_demog_addr_all$no_move_new_poll_loc=((vote_poll_demog_addr_all$changed_address==FALSE) & (vote_poll_demog_addr_all$changed_poll_loc==TRUE))
 
-#mini<-vote_poll_demog_addr_all[3000000:4000000,]
-
+# Extract years registered from calculated registration date
+vote_poll_demog_addr_all$year_reg<-str_sub(vote_poll_demog_addr_all$Voters_CalculatedRegDate, start=-4)
 
 # drop variables not in Regression and DiD Models
 vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year, 
@@ -210,15 +215,15 @@ vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year,
                                    Parties_Description,
                                    pred.whi,pred.bla,pred.his,pred.asi,pred.oth,
                                    pred_race,
-                                   Shape_Length))
+                                   Shape_Length,
+                                   year_reg))
 
 # Modify variables to fit DiD package requirements
 ## ID
 vote_poll_demog_addr_all$VOTERID<-str_sub(vote_poll_demog_addr_all$LALVOTERID, 
                                           6, nchar(vote_poll_demog_addr_all$LALVOTERID))
 vote_poll_demog_addr_all$VOTERID<-as.numeric(vote_poll_demog_addr_all$VOTERID)
-# set years to 0 and 1
-#model_data$year<-model_data$year+2017
+
 ## treatment
 vote_poll_demog_addr_all$changed_address<-as.numeric(vote_poll_demog_addr_all$changed_address)
 #vote_poll_demog_addr_all$changed_prec<-as.numeric(vote_poll_demog_addr_all$changed_prec)
