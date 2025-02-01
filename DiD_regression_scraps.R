@@ -146,3 +146,180 @@ test<-ecp_wellknown_two_data%>%
 # ex0 #2018 -2018 = group 3 first exposure
 # ggdid(ex0)
 
+
+
+
+############################### 
+########################### subsets for specific knowledge tests 
+### people who changed polling station and their new station is a religious building
+ecp_relig_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_changed_poll_loc==T)%>%
+  # only people who changed polling location to a/another religious building
+  filter(location_category_2019%in%c('religious',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter is religious
+    relig_new_poll_relig = sum(((known_religious==T)&(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### people who changed polling station w/o moving and their new station is a religious building
+no_mv_relig_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_no_move_new_poll_loc==T)%>%
+  # only people who changed polling location to a/another religious building
+  filter(location_category_2019%in%c('religious',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter is religious
+    relig_new_poll_relig = sum(((known_religious==T)&(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### people who changed polling station by moving and their new station is a religious building
+mv_relig_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_moved_new_poll_loc==T)%>%
+  # only people who changed polling location to a/another religious building
+  filter(location_category_2019%in%c('religious',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter is religious
+    relig_new_poll_relig = sum(((known_religious==T)&(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### religious people who changed polling station
+voters_relig_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_changed_poll_loc==T)%>%
+  # only religious people
+  filter(known_religious==T)%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # Whether new polling location is religious
+    relig_new_poll_relig = sum(((location_category=='religious')&(year==2019)),
+                               na.rm=T)>0
+  )%>%
+  ungroup()
+
+
+### people who changed polling station and their new station is a school
+ecp_school_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_changed_poll_loc==T)%>%
+  # only people who changed polling location to a/another school
+  filter(location_category_2019%in%c('school',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter household has children
+    parent_new_poll_school = sum(((has_child==T)&(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### people who changed polling station w/o moving and their new station is a school
+no_mv_school_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_no_move_new_poll_loc==T)%>%
+  # only people who changed polling location to a/another school
+  filter(location_category_2019%in%c('school',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter household has children
+    parent_new_poll_school = sum(((has_child==T)&(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### people who changed polling station by moving and their new station is a school
+mv_school_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_moved_new_poll_loc==T)%>%
+  # only people who changed polling location to a/another school
+  filter(location_category_2019%in%c('school',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter household has children
+    parent_new_poll_school = sum(((has_child==T)&(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+
+
+### people who changed polling station and their new station is a public building
+ecp_public_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_changed_poll_loc==T)%>%
+  # only people who changed polling location to a/another public building
+  filter(((location_category_2019%in%c('public',NA))|(location_category_2019%in%c('public_justice',NA))))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter is a civil servant
+    govemp_new_poll_public = sum(((CommercialData_OccupationIndustry=='Civil Servant')
+                                  &(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### people who changed polling station w/o moving and their new station is a public building
+no_mv_public_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_no_move_new_poll_loc==T)%>%
+  # only people who changed polling location to a/another school
+  filter(location_category_2019%in%c('public','public_justice',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter is a civil servant
+    govemp_new_poll_public = sum(((CommercialData_OccupationIndustry=='Civil Servant')
+                                  &(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### people who changed polling station by moving and their new station is a school
+mv_public_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_moved_new_poll_loc==T)%>%
+  # only people who changed polling location to a/another school
+  filter(location_category_2019%in%c('public','public_justice',NA))%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # voter is a civil servant
+    govemp_new_poll_public = sum(((CommercialData_OccupationIndustry=='Civil Servant')
+                                  &(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+### civil servants who changed polling station
+voters_govemp_two_data<-two_data%>%
+  # only people who have changed polling location
+  filter(ever_changed_poll_loc==T)%>%
+  # only parents
+  filter(CommercialData_OccupationIndustry=='Civil Servant')%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # Whether new polling location is a public building
+    govemp_new_poll_public = sum(((location_category%in%c('public','public_justice'))
+                                  &(year==2019)),na.rm=T)>0
+  )%>%
+  ungroup()
+
+
+############ Convert treatment indicators to numeric
+no_mv_wellknown_two_data['new_poll_wellknown']<- sapply(no_mv_wellknown_two_data['new_poll_wellknown'],as.numeric)
+mv_wellknown_two_data['new_poll_wellknown']<- sapply(mv_wellknown_two_data['new_poll_wellknown'],as.numeric)
+
+#no_mv_wellknown_two_data['new_poll_wellknown']<- sapply(no_mv_wellknown_two_data['new_poll_wellknown'],as.numeric)
+#mv_wellknown_two_data['new_poll_wellknown']<- sapply(mv_wellknown_two_data['new_poll_wellknown'],as.numeric)
+
+#ecp_school_two_data['parent_new_poll_school'] <- sapply(ecp_school_two_data['parent_new_poll_school'],as.numeric)
+#no_mv_school_two_data['parent_new_poll_school'] <- sapply(no_mv_school_two_data['parent_new_poll_school'],as.numeric)
+#mv_school_two_data['parent_new_poll_school'] <- sapply(mv_school_two_data['parent_new_poll_school'],as.numeric)
+
+#ecp_relig_two_data['relig_new_poll_relig'] <- sapply(ecp_relig_two_data['relig_new_poll_relig'],as.numeric)
+#no_mv_relig_two_data['relig_new_poll_relig'] <- sapply(no_mv_relig_two_data['relig_new_poll_relig'],as.numeric)
+#mv_relig_two_data['relig_new_poll_relig'] <- sapply(mv_relig_two_data['relig_new_poll_relig'],as.numeric)
+
+ecp_public_two_data['govemp_new_poll_public'] <- sapply(ecp_public_two_data['govemp_new_poll_public'],as.numeric)
+no_mv_public_two_data['govemp_new_poll_public'] <- sapply(no_mv_public_two_data['govemp_new_poll_public'],as.numeric)
+mv_public_two_data['govemp_new_poll_public'] <- sapply(mv_public_two_data['govemp_new_poll_public'],as.numeric)
+voters_govemp_two_data['govemp_new_poll_public'] <- sapply(voters_govemp_two_data['govemp_new_poll_public'],as.numeric)
+
