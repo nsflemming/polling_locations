@@ -151,8 +151,9 @@ rep_str <- c(' STREET'=' ST', ' ROAD'=' RD', ' AVENUE'=' AVE', ' DRIVE'=' DR',
 
 # get poll location data and process
 filenames<-c('Polling Place List 20180514.csv','Polling Place List 20190513.csv',
-             'Polling Place List 20201102.csv','Polling Place List 20211101.csv',
-             'Polling Place List 20220506.csv','Polling Place List 20231106.csv')
+             'Polling Place List 20201102.csv'#,'Polling Place List 20211101.csv',
+             #'Polling Place List 20220506.csv','Polling Place List 20231106.csv'
+             )
 ## Read in and process multiple location files
 for(file in filenames){
     assign(paste0('poll_loc',substr(file,20,23)),
@@ -247,7 +248,7 @@ nat_map2$ftype<-nat_map$ftype
 ## code buildings
 location.type <- c(school=730)
 location.code <- c(public=74026, justice=74034, public=78006,
-                   justice=83011, other=83033, public=83044)
+                   justice=83011, other=83033, public=83044) #other is ranger stations
 nat_map2$location_category <- names(location.type)[match(nat_map2$ftype, location.type)]
 nat_map2$location_category <- names(location.code)[match(nat_map2$fcode, location.code)]
 ## drop ftype and fcode
@@ -275,8 +276,8 @@ structures<-structures[complete.cases(structures),]
 
 ############# merge
 ### put dataframes into a list
-poll_dfs<-list('2018'=poll_loc2018, '2019'=poll_loc2019
-               #,'2020'=poll_loc2020, '2021'=poll_loc2021, 
+poll_dfs<-list(#'2018'=poll_loc2018, '2019'=poll_loc2019
+               '2020'=poll_loc2020#, '2021'=poll_loc2021, 
                #'2022'=poll_loc2022, '2023'=poll_loc2023
                )
 # join poll locations to structures matrix on address
@@ -289,8 +290,8 @@ for(i in seq_along(poll_dfs)){
   assign(paste0('poll_struct',names(poll_dfs)[i]),temp)
 }
 ### put dataframes into a list again
-poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019
-               #,'2020'=poll_struct2020, '2021'=poll_struct2021, 
+poll_struct_dfs<-list(#'2018'=poll_struct2018, '2019'=poll_struct2019
+               '2020'=poll_struct2020#, '2021'=poll_struct2021, 
                #'2022'=poll_struct2022, '2023'=poll_struct2023
                )
 
