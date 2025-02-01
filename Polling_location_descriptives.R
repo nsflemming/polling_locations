@@ -21,6 +21,39 @@ get_L2_data <- function(L2_dir, filename, vars){
 }
 
 
+## Create simplified location categories variable (subsume catholic into religious)
+simplify_loc_cat<-function(data, orig_var, simple_var){
+  data[[simple_var]]<-data[[orig_var]]
+  data[[simple_var]][data[[simple_var]]=='catholic_church']<-'religious'
+  data[[simple_var]][data[[simple_var]]=='catholic_school']<-'religious_school'
+  return(data)
+}
+
+
+## recode missing location category to other
+recode_NAtoOther<-function(data, loc_cat, loc_cat_simp){
+  data[[loc_cat_simp]][is.na(data[[loc_cat_simp]])]<-'other'
+  data[[loc_cat]][is.na(data[[loc_cat]])]<-'other'
+  return(data)
+}
+
+## recode other to missing
+recode_OthertoNA<-function(data, loc_cat, loc_cat_simp){
+  data[[loc_cat_simp]][data[[loc_cat_simp]]=='other']<-NA
+  data[[loc_cat]][data[[loc_cat]]=='other']<-NA
+  return(data)
+}
+
+
+## Factorize location categories and set reference categories
+factorize_set_ref<-function(data, loc_cat, loc_cat_simp, ref_cat){
+  data[[loc_cat_simp]]<-as.factor(data[[loc_cat_simp]])
+  data[[loc_cat]]<-as.factor(data[[loc_cat]])
+  data[[loc_cat_simp]]<-relevel(data[[loc_cat_simp]], ref=ref_cat)
+  data[[loc_cat]]<-relevel(data[[loc_cat]], ref=ref_cat)
+  return(data)
+}
+
 ################# Additional
 ### Create voter location data file for ArcGIS
 # demog_addr_2017<-read.csv(paste0(data_dir,'\\L2PA_2019_address_in_19.csv'))
@@ -45,31 +78,125 @@ data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 ### set year
 year='2018'
 
-### read in data
+## Create vector of location category labels
+loc_labels_NAsettoOther<-c('Other','Justice Location','Library','Multiple Categories',
+                           'Public Location','Public/Justice Location','Religious Location',
+                           'Religious School','School')
+loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
+                           'Public Location','Public/Justice Location','Religious Location',
+                           'Religious School','School')
+## Create dictionary of location labels
+loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
+            'other'='Other','relig_loc'='Religious Location','school'='School',
+            'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
+            'library'='Library', 'relig_school'='Religious School',
+            'catholic_school'='Catholic School','catholic_church'='Catholic Church',
+            'cath_loc'='Catholic Location')
+
+############# Plot proportion of polling locations in each category
+### read in poll location file
+poll_data18<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource18.csv'))%>%
+  select(c(location_category))
+poll_data19<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource19.csv'))%>%
+  select(c(location_category))
+poll_data20<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource20.csv'))%>%
+  select(c(location_category))
+###combine years of poll data
+poll_data18$year<-2018
+poll_data19$year<-2019
+poll_data20$year<-2020
+poll_data_all<-rbind(poll_data18,poll_data19,poll_data20)
+## set how 'other category is treated
+#other_cond='OthersettoNA'
+other_cond='NAsettoOther'
+#loc_labels=loc_labels_OthersettoNA
+loc_labels=loc_labels_NAsettoOther
+
+## Create simplified location categories variable (subsume catholic into religious)
+poll_data_all<-simplify_loc_cat(poll_data_all,'location_category','location_category_simpl')
+## recode missing location category to other or vice versa
+poll_data_all<-recode_NAtoOther(poll_data_all,'location_category','location_category_simpl')
+#poll_data<-recode_OthertoNA(poll_data,'location_category','location_category_simpl')
+
+## Factorize location categories and set reference categories
+poll_data_all<-factorize_set_ref(poll_data_all,'location_category','location_category_simpl',
+                             ref_cat = 'other')
+
+## manipulate poll data into plotting data
+poll_data_all<-poll_data_all%>%
+  group_by(year,location_category_simpl)%>%
+  summarize(num_locs=n())%>%
+  mutate(prop_locs=num_locs/sum(num_locs))%>%
+  ungroup()
+
+#rename location categories
+levels(poll_data_all$location_category_simpl)<-c('Other', 'Justice', 'Library',
+                                                 'Multiple', 'Public', 'Public/Justice',
+                                                 'Religious','Religious School','School')
+
+# plot proportions
+ggplot(poll_data_all, aes(x=fct_reorder(location_category_simpl, prop_locs), y=prop_locs,
+                 group=factor(year), fill=factor(year)))+
+  geom_col(position='dodge')+
+  labs(title='Percentage of Polling Locations in \nEach Location Category',
+       x='Location Category',
+       y='Percentage of Locations',
+       fill='Year')+
+  theme_minimal()+
+  scale_y_continuous(labels = scales::percent)+
+  scale_fill_brewer(palette='Blues')+
+  theme(plot.title = element_text(size = 20),
+        axis.text.x = element_text(size=15, angle=30,hjust = 0.9,
+                                   vjust = 1),
+        axis.title.y = element_text(size = 20),
+        axis.text.y = element_text(size = 15))
+
+
+############ Plot Proportion of voters in each location category
 # voter poll location data
 poll_data<-read.csv(paste0(data_dir,'\\FVE_',year,'_polllocation.csv'))
 # id cross walk
 crosswalk<-read.csv(paste0(data_dir,'\\L2_StateID_crosswalk_',str_sub(year, start=-2),'.csv'))
 
+## Create simplified location categories variable (subsume catholic into religious)
+poll_data<-simplify_loc_cat(poll_data,'location_category','location_category_simpl')
+
+## set how 'other category is treated
+#other_cond='OthersettoNA'
+other_cond='NAsettoOther'
+#loc_labels=loc_labels_OthersettoNA
+loc_labels=loc_labels_NAsettoOther
+## recode missing location category to other or vice versa
+poll_data<-recode_NAtoOther(poll_data,'location_category','location_category_simpl')
+#poll_data<-recode_OthertoNA(poll_data,'location_category','location_category_simpl')
+
+## Factorize location categories and set reference categories
+poll_data<-factorize_set_ref(poll_data,'location_category','location_category_simpl',
+                             ref_cat = 'other')
 
 ##### Plot proportion of registered voters at each category of polling location
 ## manipulate poll data into plotting data
 plot_data<-poll_data%>%
-  group_by(location_category)%>%
+  group_by(location_category_simpl)%>%
   summarize(num_voters=n())%>%
   ungroup()%>%
   mutate(prop_voters=num_voters/sum(num_voters))
 
+
 # plot proportions
-ggplot(plot_data, aes(x=fct_reorder(location_category, prop_voters), y=prop_voters))+
+ggplot(plot_data, aes(x=fct_reorder(location_category_simpl, prop_voters), y=prop_voters))+
   geom_col(fill='blue4')+
   labs(title=paste0('Proportion of Voters Assigned to \nEach Polling Location Category ',year),
        x='Location Category',
-       y='Proportion of Voters')+
+       y='Percentage of Voters')+
   theme_minimal()+
+  scale_y_continuous(labels = scales::percent)+
+  scale_x_discrete(labels= loc_labels)+
   theme(plot.title = element_text(size = 20),
-        axis.title.x = element_text(size = 15),
-        axis.title.y = element_text(size = 15))
+        axis.text.x = element_text(size=15, angle=30,hjust = 0.9,
+                                   vjust = 1),
+        axis.title.y = element_text(size = 20),
+        axis.text.y = element_text(size = 15))
 
 ##### Plot proportion of registered voters at each category of polling location by rural urban divide
 ### Read in Data
