@@ -136,8 +136,8 @@ poll_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places'
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 struct_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/Structures'
 # get poll location data and process
-filenames<-c('poll_struct_govsource2018.csv', 'poll_struct_govsource2019.csv'
-             #,'poll_struct_govsource2020.csv', 'poll_struct_govsource2021.csv',
+filenames<-c('poll_struct_govsource2018.csv', 'poll_struct_govsource2019.csv',
+             'poll_struct_govsource2020.csv'#, 'poll_struct_govsource2021.csv',
              #'poll_struct_govsource2022.csv', 'poll_struct_govsource2023.csv'
              )
 for(file in filenames){
@@ -150,8 +150,8 @@ for(file in filenames){
          'Description')))
 }
 
-poll_dfs<-list('18'=poll_loc2018,'19'=poll_loc2019
-               #,'20'=poll_loc2020,'21'=poll_loc2021,
+poll_dfs<-list('18'=poll_loc2018,'19'=poll_loc2019,
+               '20'=poll_loc2020#,'21'=poll_loc2021,
             #'22'=poll_loc2022,'23'=poll_loc2023
             )
 
@@ -228,7 +228,7 @@ master_index<-master_index%>%
                                .default = 1))
 ## save copy of matrix
 setwd("C:/Users/natha/Desktop/Polling Places DiD/data/Structures")
-#write.csv(master_index, 'keyword_matrix.csv')
+write.csv(master_index, paste0('keyword_matrix',names(poll_dfs[i]),'.csv'))
 
 ############## merge poll and keyword index
 #master_index<-read.csv(paste0(struct_dir,'\\keyword_matrix.csv'))
@@ -255,12 +255,6 @@ polltest<-polltest%>%
 setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
 write.csv(polltest, paste0('poll_struct_key_govsource',names(poll_dfs[i]),'.csv'))
 }
-
-
-
-#plot categories
-ggplot(data=polltest, aes(x=location_category))+
-  geom_histogram(stat='count')
 
 
 
