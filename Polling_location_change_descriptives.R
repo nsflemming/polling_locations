@@ -8,7 +8,25 @@ library(data.table) #read in data selectively
 library(usmap) #plotting on map of PA
 
 ########## Functions
+## create address from address components
+make_address <- function(data, num, direction, street, street_type, city,
+                         state, postcode){
+  data[['address']]<-paste0(data[[num]], ' ',data[[direction]], ' ',data[[street]], 
+                            ' ',data[[street_type]], ', ',data[[city]], ', ', 
+                            data[[state]],' ', data[[postcode]])
+  #replace any douple spaces created by a missing direction with a single space
+  data[['address']]<-str_replace_all(data[['address']], '  ', ' ')
+  return(data)
+}
 
+## read in location data
+get_poll <- function(dir, filename, num, direction, street, street_type, city,
+                     state, postcode){
+  setwd(dir)
+  data <- read.csv(filename)
+  data<-make_address(data, num, direction, street, street_type, city, state, postcode)
+  return(data)
+}
 
 
 ########################################################### Main
@@ -16,15 +34,39 @@ library(usmap) #plotting on map of PA
 data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
 results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
-# read in data
-setwd(data_dir)
+poll_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places'
+
+############################################ CHange by proportion of locations
+## string for abbreviating street names
+rep_str <- c(' STREET'=' ST', ' ROAD'=' RD', ' AVENUE'=' AVE', ' DRIVE'=' DR', 
+             ' BOULEVARD'=' BLVD',
+             ' NORTH'=' N', ' SOUTH'=' S', ' EAST'=' E', ' WEST'=' W')
+
+# get poll location data and process
+filenames<-c('Polling Place List 20180514.csv','Polling Place List 20190513.csv',
+             'Polling Place List 20201102.csv','Polling Place List 20211101.csv',
+             'Polling Place List 20220506.csv','Polling Place List 20231106.csv'
+)
+## Read in and process multiple location files
+for(file in filenames){
+  assign(paste0('poll_loc',substr(file,20,23)),
+         get_poll(poll_dir, file, num='HouseNum', direction='PrefixDirection',
+                  street='Street', street_type = 'StreetType',city='City',
+                  state="State", postcode='PostalCode'))
+}
+
+### create plotting dataframe
+plot_data<-data.frame(matrix(ncol=2, nrow=0))
+colnames(plot_data)<-c('Year_Pair', 'Change')
+plot_data$Year_Pair<-c('2018/2019','2019/2020','2020/2021','2021/2022','2022/2023')
+########### UNFINISHED #####################
 #two_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
 #state <- map_data("state")
 #PA <- subset(state, region=="pennsylvania")
 #counties <- map_data("county")
 #PA_county <- subset(counties, region=="pennsylvania")
 
-
+############################################ CHange by proportion of voters
 ### create indicators for ever being treated
 #two_data<-two_data%>%
 two_data<-two_data%>%
