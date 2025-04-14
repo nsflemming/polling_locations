@@ -9,7 +9,7 @@ library(scales) #plotting
 #read in data
 struct_dir<-("C:/Users/natha/Desktop/Polling Places DiD/data/Structures")
 data_dir<-("C:/Users/natha/Desktop/Polling Places DiD/data")
-year='19'
+year='18'
 #gov_struct_matrix<-read.csv(paste0(struct_dir,'/structure_matrix.csv'))
 #keyword_matrix <- read.csv(paste0(struct_dir,'/keyword_matrix',year,'.csv'))
 
