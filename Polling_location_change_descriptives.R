@@ -58,7 +58,7 @@ for(file in filenames){
 ### create plotting dataframe
 plot_data<-data.frame(matrix(ncol=2, nrow=0))
 colnames(plot_data)<-c('Year_Pair', 'Change')
-plot_data$Year_Pair<-c('2018/2019','2019/2020','2020/2021','2021/2022','2022/2023')
+#plot_data$Year_Pair<-c('2018/2019','2019/2020','2020/2021','2021/2022','2022/2023')
 ########### UNFINISHED #####################
 #two_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
 #state <- map_data("state")
@@ -67,28 +67,131 @@ plot_data$Year_Pair<-c('2018/2019','2019/2020','2020/2021','2021/2022','2022/202
 #PA_county <- subset(counties, region=="pennsylvania")
 
 ############################################ CHange by proportion of voters
+# set directories
+data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
+results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
+plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
+# read in two-time period data
+setwd(data_dir)
+#two_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
+model_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
+
+
+## Recode extraneous parties to 'other'
+model_data$Parties_Description <- fct_collapse(model_data$Parties_Description, 
+                                               Other = c('American', 'American Independent','Anarchist','Bull Moose',
+                                                         'Christian','Communist','Conservative','Constitution',
+                                                         'Constitutional','Consumer','Federalist','Free Choice',
+                                                         'Freedom','Green','Independence','Independent Democrat',
+                                                         'Independent Republican','Labor','Liberal',
+                                                         'Libertarian','Natural Law','Non-Partisan','Patriot',
+                                                         'Peace and Freedom','Populist','Progressive','Prohibition','Rainbow',
+                                                         'Reform','Registered Independent','Right to Life',
+                                                         'Social Democrat','Socialist','Socialist Labor',
+                                                         'Taxpayers','Unknown','Whig'))
+model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
+
+## create vector of location categories
+#categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
+#              'justice_loc','library','relig_school')
+## Create vector of location category labels
+loc_labels_NAsettoOther<-c('Other','Justice Location','Library','Multiple Categories',
+                           'Public Location','Public/Justice Location','Religious Location',
+                           'Religious School','School')
+loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
+                           'Public Location','Public/Justice Location','Religious Location',
+                           'Religious School','School')
+## Create dictionary of location labels
+loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
+            'other'='Other','relig_loc'='Religious Location','school'='School',
+            'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
+            'library'='Library', 'relig_school'='Religious School',
+            'catholic_school'='Catholic School','catholic_church'='Catholic Church',
+            'cath_loc'='Catholic Location')
+## Create dictionary of variable labels
+var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
+            'CommercialData_EstimatedHHIncomeAmount'='Estimated HH Income',
+            'Residence_Families_HHCount'='HH Resident Count',
+            'known_religious'='Known Religious',
+            'CommercialData_LikelyUnion'='Likely Union Member', 
+            'CommercialData_OccupationIndustry'='Occupation Industry',
+            'CommercialData_OccupationIndustry'='Occupation Group',
+            'has_child'='Has Child(ren)','known_gov_emp'='Known Government Employee',
+            'Parties_Description'='Political Party','pred_race'='Predicted Race',
+            'Shape_Length'='Distance to Polling Station','known_catholic'='Known Catholic')
+
+## Calculate years registered based on dependent variable year
+model_data$years_reg<-2018-as.numeric(model_data$year_reg)
+
+## Common set of covariates
+common_covars <-c(
+  # Demographics
+  'Voters_Gender', 'Voters_Age', 'Parties_Description',
+  'pred_race',
+  'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+  'known_religious','CommercialData_LikelyUnion', 
+  'CommercialData_OccupationGroup',
+  'Shape_Length',
+  'years_reg'
+)
+## Create simplified location categories variable (subsume catholic into religious)
+# model_data$location_category_simpl<-model_data$location_category
+# model_data$location_category_simpl[model_data$location_category_simpl=='catholic_church']<-'religious'
+# model_data$location_category_simpl[model_data$location_category_simpl=='catholic_school']<-'religious_school'
+
+## set how 'other category is treated
+#other_cond='default'
+#other_cond='OtherSettoNA'
+other_cond='NASettoOther'
+loc_labels=loc_labels_NAsettoOther
+#loc_labels=loc_labels_OthersettoNA
+## recode missing or other
+model_data$location_category[is.na(model_data$location_category)]<-'other'
+#model_data$location_category[model_data$location_category=='other']<-NA
+
+###### Split location category into years
+model_data$location_category_2018<-model_data$location_category
+model_data$location_category_2018[model_data$year==2019]<-NA
+model_data$location_category_2019<-model_data$location_category
+model_data$location_category_2019[model_data$year==2018]<-NA
+
+test <- model_data[order(model_data$VOTERID),]
+test18<-test%>%
+  filter(year==2018)%>%
+  select(LALVOTERID, VOTERID, location_category)
+
+test19<-test%>%
+  filter(year==2019)%>%
+select(LALVOTERID, VOTERID, location_category)
+
+test_both<-left_join(test18,test19, by = "LALVOTERID", suffix = c("", "_2018"))
+sum(test_both$location_category!=test_both$location_category_2018, na.rm = T)
+
+## Factorize variables
+#location categories
+model_data$location_category<-as.factor(model_data$location_category)
+model_data$location_category<-relevel(model_data$location_category, ref='other')
 ### create indicators for ever being treated
-#two_data<-two_data%>%
-two_data<-two_data%>%
+two_data<-model_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
-  mutate(#ever_changed_precinct=sum(changed_prec), #300,838 cases (2%)
-    #ever_no_move_new_precinct=sum(no_move_new_precinct), #367,478 cases (3%)
-    #ever_moved_new_precinct=sum(moved_new_precinct),#66,640 cases (0.5%)
-    ever_changed_poll_cat=(sum(changed_poll_cat)>0),
-    ever_changed_poll_loc=(sum(changed_poll_loc)>0),
-    ever_moved_new_poll_cat=(sum(moved_new_poll_cat)>0),
-    ever_no_move_new_poll_cat=(sum(no_move_new_poll_cat)>0),
-    ever_moved_old_poll_cat=(sum(moved_old_poll_cat)>0),
-    ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
-    ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0),
-    ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0))%>% 
+  mutate(#ever_changed_poll_cat=(sum(changed_poll_cat)>0),
+         ever_changed_poll_loc=(sum(changed_poll_loc)>0),
+         #ever_moved_new_poll_cat=(sum(moved_new_poll_cat)>0),
+         #ever_no_move_new_poll_cat=(sum(no_move_new_poll_cat)>0),
+         #ever_moved_old_poll_cat=(sum(moved_old_poll_cat)>0),
+         ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
+         ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0),
+         ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0))%>% 
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
-  mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))%>%
-  ungroup()
-### save to csv?
-#write.csv(two_data,'')
+  mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)),
+         ## Calculate years registered by 2018
+         years_reg = 2018-as.numeric(year_reg))%>%
+  ungroup()%>%
+  #remove duplicate voters (not sure where they came from)
+  distinct(LALVOTERID, year, .keep_all = T)
+
 
 
 ##### Changes in location and category numbers
