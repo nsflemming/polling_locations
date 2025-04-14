@@ -225,19 +225,19 @@ common_covars <-c(
 
 ## set how 'other category is treated
 #other_cond='default'
-other_cond='OtherSettoNA'
-#other_cond='NASettoOther'
-#loc_labels=loc_labels_NAsettoOther
-loc_labels=loc_labels_OthersettoNA
+#other_cond='OtherSettoNA'
+other_cond='NASettoOther'
+loc_labels=loc_labels_NAsettoOther
+#loc_labels=loc_labels_OthersettoNA
 ## recode missing or other
-#model_data$location_category[is.na(model_data$location_category)]<-'other'
-model_data$location_category[model_data$location_category=='other']<-NA
+model_data$location_category[is.na(model_data$location_category)]<-'other'
+#model_data$location_category[model_data$location_category=='other']<-NA
 
 ## Factorize variables
 #location categories
 model_data$location_category<-as.factor(model_data$location_category)
-#model_data$location_category<-relevel(model_data$location_category, ref='other')
-model_data$location_category<-relevel(model_data$location_category, ref='multiple')
+model_data$location_category<-relevel(model_data$location_category, ref='other')
+#model_data$location_category<-relevel(model_data$location_category, ref='multiple')
 
 #race
 model_data$pred_race <- as.factor(model_data$pred_race)
@@ -424,9 +424,9 @@ voters_cath_two_data$voted<-as.numeric(voters_cath_two_data$voted)
 # }
 
 #### DiD Regression
-dvar<-'ever_changed_poll_loc'
+dvar<-'ever_no_move_new_poll_loc'
 # remove missing to prevent different length Y1 and Y0
-mini<-two_data%>%
+mini<-no_chng_or_no_mv_two_data%>%
   select(all_of(c('voted',dvar,'LALVOTERID','VOTERID','year'
            ,'Voters_Gender'
            ,'Voters_Age','Parties_Description','pred_race',
@@ -441,19 +441,29 @@ mini<-two_data%>%
   ungroup()
 
 # fix covariates at 2018 values
-mini<-mini%>%
-  group_by(LALVOTERID)%>%
-  mutate(Voters_Gender=Voters_Gender[year==2018],
-         Voters_Age=Voters_Age[year==2018],
-         Parties_Description=Parties_Description[year==2018],
-         pred_race=pred_race[year==2018],
-         CommercialData_EstimatedHHIncomeAmount=CommercialData_EstimatedHHIncomeAmount[year==2018],
-         Residence_Families_HHCount=Residence_Families_HHCount[year==2018],
-         known_religious=known_religious[year==2018],
-         CommercialData_LikelyUnion=CommercialData_LikelyUnion[year==2018],
-         CommercialData_OccupationGroup=CommercialData_OccupationGroup[year==2018],
-         years_reg=years_reg[year==2018])%>%
-  ungroup()
+## Filter data for year 2018
+mini_2018 <- mini %>%
+  filter(year == 2018) %>%
+  select(LALVOTERID, Voters_Gender, Voters_Age, Parties_Description, pred_race, 
+         CommercialData_EstimatedHHIncomeAmount, Residence_Families_HHCount, 
+         known_religious, CommercialData_LikelyUnion, CommercialData_OccupationGroup, years_reg)
+## Join back to the original dataset
+mini <- mini %>%
+  left_join(mini_2018, by = "LALVOTERID", suffix = c("", "_2018")) %>%
+  mutate(
+    Voters_Gender = Voters_Gender_2018,
+    Voters_Age = Voters_Age_2018,
+    Parties_Description = Parties_Description_2018,
+    pred_race = pred_race_2018,
+    CommercialData_EstimatedHHIncomeAmount = CommercialData_EstimatedHHIncomeAmount_2018,
+    Residence_Families_HHCount = Residence_Families_HHCount_2018,
+    known_religious = known_religious_2018,
+    CommercialData_LikelyUnion = CommercialData_LikelyUnion_2018,
+    CommercialData_OccupationGroup = CommercialData_OccupationGroup_2018,
+    years_reg = years_reg_2018
+  ) %>%
+  select(-ends_with("_2018"))  # Remove extra columns
+
 
 out1 <- drdid(yname = "voted", #outcome
               dname = dvar, #treatment group
