@@ -1,6 +1,7 @@
 #Nathaniel Flemming 15 3 24
 ### categorizing polling locations using structure data
 ### polling location lists provided by state government
+#### Full breakdown into all categories, rather than lumping some into other
 
 library(dplyr)
 library(stringr) #string manipulation
@@ -248,8 +249,9 @@ nat_map2$ftype<-nat_map$ftype
 ## code buildings
 location.type <- c(school=730)
 ### NOTE COMBINING PUBLIC BUILDINGS INTO GOVERNMENT CATEGORY
-location.code <- c(firestation=74026, policestation=74034, government=78006,
-                   courthouse=83011, other=83033, government=83044) #78006: postoffice, 83044:townhall, 83011:rangerstation
+location.code <- c(firestation=74026, policestation=74034, postoffice=78006,
+                   courthouse=83011, rangerstation=83033, government=83044) 
+              #78006: postoffice, 83044:townhall, 83011:court house, 83033:Ranger station
 nat_map2$location_category <- names(location.type)[match(nat_map2$ftype, location.type)]
 nat_map2$location_category <- names(location.code)[match(nat_map2$fcode, location.code)]
 ## drop ftype and fcode
@@ -262,13 +264,13 @@ nat_map2<-subset(nat_map2, select = -c(ftype,fcode))
 structures<-rbind(worship, cath_school, education, firestations, policestations, 
                   nat_map2, libraries)
 structures<-structures%>%
-
   mutate(religious=as.numeric(str_detect(location_category, 'religious')),
          catholic_school=as.numeric(str_detect(location_category, 'catholic_school')),
          school=as.numeric(str_detect(location_category, 'school')),
          government=as.numeric(str_detect(location_category, 'government')),
          firestation=as.numeric(str_detect(location_category, 'firestation')),
-         other=as.numeric(str_detect(location_category, 'other')),
+         rangerstation=as.numeric(str_detect(location_category, 'rangerstation')),
+         postoffice=as.numeric(str_detect(location_category, 'postoffice')),
          government=as.numeric(str_detect(location_category, 'government')),
          policestation=as.numeric(str_detect(location_category, 'policestation')),
          courthouse=as.numeric(str_detect(location_category, 'courthouse')),
@@ -304,54 +306,52 @@ for(i in seq_along(poll_struct_dfs)){
   temp<-poll_struct_dfs[[i]]%>%
     group_by(address, PrecinctCode)%>%
     mutate(location_count = sum(across(c(religious,catholic_school,school,
-                                         government,firestation,other,
+                                         government,firestation,rangerstation,
+                                         postoffice,
                                          policestation,courthouse,
                                          library))))%>%
     ungroup()
   ##### Create location categories
   temp$location_category[temp$religious==1]<-'religious'
-  temp$location_category[temp$catholic_school==1]<-'catholic_school'
+  temp$location_category[temp$catholic_school==1]<-'catholic school'
   temp$location_category[temp$school==1]<-'school'
   temp$location_category[temp$government==1]<-'government'
-  temp$location_category[temp$firestation==1]<-'firestation'
-  temp$location_category[temp$other==1]<-'other'
-  #temp$location_category[temp$rangerstation==1]<-'rangerstation'
-  #temp$location_category[temp$postoffice==1]<-'postoffice'
-  temp$location_category[temp$policestation==1]<-'policestation'
+  temp$location_category[temp$firestation==1]<-'fire station'
+  #temp$location_category[temp$other==1]<-'other'
+  temp$location_category[temp$rangerstation==1]<-'ranger station'
+  temp$location_category[temp$postoffice==1]<-'post office'
+  temp$location_category[temp$policestation==1]<-'police station'
   temp$location_category[temp$courthouse==1]<-'courthouse'
   temp$location_category[temp$location_count>1]<-'multiple'
-  # ###  Create police stations/townhalls and religious schools flags
-  # temp<-temp%>%
-  #   # Group rows by polling location
-  #   group_by(address, PrecinctCode)%>%
-  #   # Sum flags for categories
-  #   mutate(justice = sum(across(c(policestation,courthouse))),
-  #          public_justice = sum(across(c(citytownhall,justice))),
-  #          religious_school = sum(across(c(religious,school,catholic_school))))%>%
-  #   ungroup()
-  # ## Add to category variable
-  # temp$location_category[temp$public_justice>1]<-'public_justice'
-  # temp$location_category[temp$religious_school>1]<-'religious_school'
-  # ## Add catholic schools back in
-  # temp$location_category[temp$catholic_school>0]<-'catholic_school'
-  # 
-  # #remove individual categories and location count
+  ###  Create police stations/townhalls and religious schools flags
+  temp<-temp%>%
+    # Group rows by polling location
+    group_by(address, PrecinctCode)%>%
+    # Sum flags for categories
+    mutate(public_justice = sum(across(c(government,policestation))),
+           religious_school = sum(across(c(religious,school,catholic_school))))%>%
+    ungroup()
+  ## Add to category variable
+  temp$location_category[temp$public_justice>1]<-'government/police'
+  temp$location_category[temp$religious_school>1]<-'religious school'
+  ## Add catholic schools back in
+  temp$location_category[temp$catholic_school>0]<-'catholic school'
+
+  #remove individual categories and location count
   # temp<-subset(temp, select=-c(religious,catholic_school,school,
-  #                              citytownhall,firestation,rangerstation,
-  #                              postoffice,policestation,courthouse,
+  #                              government,firestation,rangerstation,
+  #                              postoffice,
+  #                              policestation,courthouse,
   #                              library))
-  #remove duplicates 
-  temp<-unique(temp)
-  ##(still have extra rows?)
+  print(paste0('Missingness: ',sum(is.na(temp$location_category))))
   ####### save to csv
   #set directory
-  setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
-  write.csv(temp, paste0('poll_struct_govsource_underlying',names(poll_struct_dfs)[i],'.csv'))
+  #setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
+  #write.csv(temp, paste0('poll_struct_govsource_underlying',names(poll_struct_dfs)[i],'.csv'))
 }
 
 #calc missingness by checking which addresses are in structure list
-#1-(sum(poll$address%in%structures$address)/9235) #60.9% missing
-
+#1-(sum(temp$address%in%structures$address)/9235)
 
 
 
