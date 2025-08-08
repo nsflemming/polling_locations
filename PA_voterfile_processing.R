@@ -36,7 +36,7 @@ read_and_combine<-function(filepaths, columns, countynames){
 #### set directories
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 #### set year
-year='2020'
+year='2019'
 
 ### create vector of county names
 counties = c('ADAMS', 'ALLEGHENY', 'ARMSTRONG', 'BEAVER', 'BEDFORD', 'BERKS', 'BLAIR', 'BRADFORD', 'BUCKS', 'BUTLER',
