@@ -1,5 +1,7 @@
 # Nathaniel Flemming 21 3 24
 ## coding missing polling locations with keywords
+#### Full breakdown into all categories, rather than lumping some into other
+
 
 library(dplyr)
 library(stringr) #string manipulation
@@ -79,11 +81,13 @@ gov_wrds<-c(' MUNI ',' MUNIC ', 'MUNICIPAL', ' BORO ','BOROUGH','TOWNSHIP','TWP'
             'CIVIC BUILDING','CIVIC BLDG',
             'COUNTY SERVICE','GOVERN SERV CENTER', 'PUBLIC WORKS', 'PUBLIC SAFETY',
             'HUMAN SERVICES', 'EMERGENCY SERVICE','COMMUNITY ACT',
-            'GOVERNMENT','COURT HOUSE', 'COURT', 'COURTHOUSE', 'DISTRICT JUDGE',
+            'GOVERNMENT',
             'ARMORY', 'ADMINSTRATION', 'ADMINISTRATIVE', 'AUTHORITY',
             'PARAMEDIC', 'AMBULANCE','EMS STATION',
             'REGIONAL','COMMISSION',
             'CONVENTION CENTER','MUSEUM','AIRPORT','TRAIN STATION','TERMINAL')
+# Courthouses
+crt_wrds<-c('COURT HOUSE', 'COURT', 'COURTHOUSE', 'DISTRICT JUDGE')
 
 ## Combine government and fire
 
@@ -168,7 +172,7 @@ for (i in 1:length(poll_dfs)){
   religious<-as.numeric(religious)
   
   # Vector of public centers
-  other<-as.numeric(pollnamegrepl(cent_wrds, poll_dfs[[i]], 'Description'))
+  pubcen<-as.numeric(pollnamegrepl(cent_wrds, poll_dfs[[i]], 'Description'))
   
   # vector of fire stations
   firestation<-as.numeric(pollnamegrepl(fire_wrds, poll_dfs[[i]], 'Description'))
@@ -180,101 +184,142 @@ for (i in 1:length(poll_dfs)){
   government<-government|boro_indx
   government<-as.numeric(government)
   
+  #Vector of courthouses
+  courthouse<-pollnamegrepl(crt_wrds, poll_dfs[[i]], 'Description')
+  
   #vector of club polling locations
-  other<-as.numeric(grepl('CLUB', poll_dfs[[i]]$Description))
+  club<-as.numeric(grepl('CLUB', poll_dfs[[i]]$Description))
   
   #Vector of apartments
-  other<-pollnamegrepl(apt_wrds, poll_dfs[[i]], 'Description')
+  apt<-pollnamegrepl(apt_wrds, poll_dfs[[i]], 'Description')
   #Abbreviation for apartment
   ab_indx<-str_detect(poll_dfs[[i]]$Description, "(^APT[:space:])|([:space:]APTS$)")
-  other<-other|ab_indx
-  other<-as.numeric(other)
+  apt<-apt|ab_indx
+  apt<-as.numeric(apt)
   
   #vector of library polling locations
   library<-as.numeric(grepl('LIBRARY', poll_dfs[[i]]$Description))
   
   # vector of veterans associations
-  other<-as.numeric(pollnamegrepl(vet_wrds, poll_dfs[[i]], 'Description'))
+  vet<-as.numeric(pollnamegrepl(vet_wrds, poll_dfs[[i]], 'Description'))
   
   # Vector of senior centers
-  other<-as.numeric(pollnamegrepl(sen_wrds, poll_dfs[[i]], 'Description'))
+  sencent<-as.numeric(pollnamegrepl(sen_wrds, poll_dfs[[i]], 'Description'))
   
   #vector of association polling locations
-  other<-as.numeric(pollnamegrepl(assc_wrds, poll_dfs[[i]], 'Description'))
+  assc<-as.numeric(pollnamegrepl(assc_wrds, poll_dfs[[i]], 'Description'))
   
   #vector of sports polling locations
-  other<-as.numeric(pollnamegrepl(sport_wrds, poll_dfs[[i]], 'Description'))
+  sport<-as.numeric(pollnamegrepl(sport_wrds, poll_dfs[[i]], 'Description'))
   
   #vector of military polling locations
-  other<-as.numeric(pollnamegrepl(milit_wrds, poll_dfs[[i]], 'Description'))
+  milit<-as.numeric(pollnamegrepl(milit_wrds, poll_dfs[[i]], 'Description'))
   
   #vector of union polling locations
-  other<-as.numeric(pollnamegrepl(union_wrds, poll_dfs[[i]], 'Description'))
+  union<-as.numeric(pollnamegrepl(union_wrds, poll_dfs[[i]], 'Description'))
   
   #vector of other polling locations
   other<-as.numeric(pollnamegrepl(othr_wrds, poll_dfs[[i]], 'Description'))
   
   ################### master index combining all location vectors
-  master_index<-as.data.frame(cbind(library, government, firestation, other, 
-                                    religious,school))
+  keyword_match_index<-as.data.frame(cbind(school,religious,pubcen,firestation, 
+                                           government,courthouse,club,apt,library, 
+                                           vet,sencent,assc,sport,milit,union,other))
   # create new category for locations with multiple keywords
-  master_index<-master_index%>%
-    mutate(keyword_count = rowSums(across(c(library, government, firestation, 
-                                            other, religious,school)))) %>%
+  keyword_match_index<-keyword_match_index%>%
+    mutate(keyword_count = rowSums(across(c(school,religious,pubcen,firestation, 
+                                            government,courthouse,club,apt,library, 
+                                            vet,sencent,assc,sport,milit,union,other)))) %>%
     mutate(mult_indx = case_when(keyword_count == 0 ~ 0, keyword_count == 1 ~ 0,
                                  .default = 1))
   ## save copy of matrix
-  setwd("C:/Users/natha/Desktop/Polling Places DiD/data/Structures")
-  write.csv(master_index, paste0('keyword_matrix_underlying',names(poll_dfs[i]),'.csv'))
-  
-  ############## merge structure coded and keyword index
-  #master_index<-read.csv(paste0(struct_dir,'\\keyword_matrix_underlying.csv'))
-  #polltest<-cbind(poll_dfs[[i]], master_index)
-  master_index$X<-seq(1:nrow(master_index))
-  struct_key<-left_join(poll_dfs[[i]], master_index, by='X')%>%
+  print('Not saving matrix')
+  #setwd("C:/Users/natha/Desktop/Polling Places DiD/data/Structures")
+  #write.csv(keyword_match_index, paste0('keyword_matrix_underlying',names(poll_dfs[i]),'.csv'))
+}
+
+############## merge structure coded and keyword index
+cols_to_drop<-c('mult_indx','school','religious','catholic_school','religious_school',
+                'pubcen','firestation','rangerstation','postoffice','policestation',
+                'government','courthouse','public_justice','club','apt','library',
+                'vet','sencent','assc','sport','milit','union','other',
+                'keyword_count', 'location_count','X')
+for (i in 1:length(poll_dfs)){
+  keyword_match_index<-read.csv(paste0(struct_dir,'/keyword_matrix_underlying',names(poll_dfs[i]),'.csv'))
+  #keyword_match_index$X<-seq(1:nrow(keyword_match_index))
+  struct_and_keyword_index<-left_join(poll_dfs[[i]], keyword_match_index, by='X')%>%
     rowwise()%>%
-    mutate(religious = as.numeric(sum(religious.x,religious.y, na.rm=T)>0),
-           school = as.numeric(sum(school.x,school.y, na.rm=T)>0),
+    ## set indicator for category to 1 if structure data or keyword match a category
+    ### Only need x and y for categories present in both structure and keyword data
+    mutate(school = as.numeric(sum(school.x,school.y, na.rm=T)>0),
+           religious = as.numeric(sum(religious.x,religious.y, na.rm=T)>0),
+           pubcen = as.numeric(sum(pubcen, na.rm=T)>0),
            firestation = as.numeric(sum(firestation.x,firestation.y, na.rm=T)>0),
-           library = as.numeric(sum(library.x,library.y, na.rm=T)>0),
            government = as.numeric(sum(government.x,government.y, na.rm=T)>0),
-           other = as.numeric(sum(other.x,other.y, na.rm=T)>0))%>%
-    select(-c(religious.x,religious.y,school.x,school.y,firestation.x,
-              firestation.y,library.x,library.y,government.x,government.y,
-              other.x,other.y))
-  #replace NA with 0s
-  struct_key[c("catholic_school", "government",'other',
-               'policestation','courthouse')][is.na(struct_key[c("catholic_school", 
-               "government",'other','policestation','courthouse')])] <- 0
-  # #add in keyword codings conditionally
-  # polltest<-polltest%>%
-  #   mutate(location_category = case_when(mult_indx==1&is.na(location_category) ~ 'multiple',
-  #                                        library==1&is.na(location_category) ~ 'library',
-  #                                        government==1&is.na(location_category) ~ 'government',
-  #                                        firestation==1&is.na(location_category) ~ 'firestation',
-  #                                        other==1&is.na(location_category) ~ 'other',
-  #                                        #religious==1&school==1&is.na(location_category) ~ 'religious_school',
-  #                                        religious==1&is.na(location_category) ~ 'religious',
-  #                                        school==1&is.na(location_category) ~ 'school',
-  #                                        .default = location_category)) %>%
-  #   #remove columns
-  #   select(!c(mult_indx,library,government,firestation,other,religious,school))
+           courthouse = as.numeric(sum(courthouse.x,courthouse.y, na.rm=T)>0),
+           club = as.numeric(sum(club, na.rm=T)>0),
+           apt = as.numeric(sum(apt, na.rm=T)>0),
+           library = as.numeric(sum(library.x,library.y, na.rm=T)>0),
+           vet = as.numeric(sum(vet, na.rm=T)>0),
+           sencent = as.numeric(sum(sencent, na.rm=T)>0),
+           assc = as.numeric(sum(assc, na.rm=T)>0),
+           sport = as.numeric(sum(sport, na.rm=T)>0),
+           milit = as.numeric(sum(milit, na.rm=T)>0),
+           union = as.numeric(sum(union, na.rm=T)>0),
+           other = as.numeric(sum(other, na.rm=T)>0))%>%
+    # Remove uncombined columns
+    select(-c(school.x,school.y,religious.x,religious.y,
+              firestation.x,firestation.y,government.x,government.y,courthouse.x,
+              courthouse.y,library.x,library.y))
+  #replace NAs in location category columns with 0s
+  struct_and_keyword_index[c('religious',"catholic_school", "government",
+                             'firestation','rangerstation','postoffice',
+                             'policestation','courthouse')][is.na(struct_and_keyword_index[c(
+                 'religious',"catholic_school", "government",'firestation',
+                 'rangerstation','postoffice','policestation','courthouse')])] <- 0
+  # Add in keyword codings conditionally
+  struct_and_keyword_index<-struct_and_keyword_index%>%
+    mutate(location_category = case_when(# Locations with multiple matches
+                                          ## Assign 'multiple' first to avoid 
+                                          ##  individual categories overwriting 
+                                          ##  each other
+                                         mult_indx==1&is.na(location_category) ~ 'multiple',
+                                         # Locations with single matches
+                                         school==1&is.na(location_category) ~ 'school',
+                                         religious==1&is.na(location_category) ~ 'religious',
+                                         catholic_school==1&is.na(location_category) ~ 'catholic school',
+                                         pubcen==1&is.na(location_category) ~ 'public center',
+                                         firestation==1&is.na(location_category) ~ 'fire station',
+                                         rangerstation==1&is.na(location_category) ~ 'ranger station',
+                                         postoffice==1&is.na(location_category) ~ 'post office',
+                                         policestation==1&is.na(location_category) ~ 'police station',
+                                         government==1&is.na(location_category) ~ 'government',
+                                         courthouse==1&is.na(location_category) ~ 'courthouse',
+                                         club==1&is.na(location_category) ~ 'club',
+                                         apt==1&is.na(location_category) ~ 'apartment',
+                                         library==1&is.na(location_category) ~ 'library',
+                                         vet==1&is.na(location_category) ~ 'veteran',
+                                         sencent==1&is.na(location_category) ~ 'senior center',
+                                         assc==1&is.na(location_category) ~ 'association',
+                                         sport==1&is.na(location_category) ~ 'sport',
+                                         milit==1&is.na(location_category) ~ 'military',
+                                         union==1&is.na(location_category) ~ 'union',
+                                         other==1&is.na(location_category) ~ 'other',
+                                         # Valid/identified multiple category locations
+                                         religious==1&school==1 ~ 'religious school',
+                                         government==1&policestation==1 ~ 'government/police',
+                                         .default = location_category)) %>%
+    #remove columns
+    select(!any_of(cols_to_drop))%>%
+  #remove duplicates created by having multiple matching categories
+    distinct()
   
   
   #calc missingness
-  #sum(is.na(polltest$location_category))/9156 #9.64% missing
-  
+  print(paste0('Missingness w/ keywords added in: ',sum(is.na(struct_and_keyword_index$location_category))/nrow(struct_and_keyword_index)))
+  #print('Not Saving')
   ####### save to csv
   #set directory
   setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
-  write.csv(struct_key, paste0('poll_struct_key_govsource_underlying',names(poll_dfs[i]),'.csv'))
+  write.csv(struct_and_keyword_index, paste0('poll_struct_key_govsource_underlying',names(poll_dfs[i]),'.csv'))
 }
-
-
-
-
-
-
-
-
-
