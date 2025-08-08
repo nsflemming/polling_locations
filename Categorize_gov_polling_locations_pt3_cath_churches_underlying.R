@@ -62,7 +62,7 @@ catholic<-read.csv(paste0(struct_dir,'\\Cath_Dir_PA_Churches_1_20_2025.csv'))
 #### shorten longer zip codes
 catholic$PostalCode<-str_sub(catholic$ZIP, end=5)
 
-years<-c('18','19')
+years<-c('18','19','20')
 for(year in years){
   assign('poll_struct_key_govsource', read.csv(paste0(data_dir,'/poll_struct_key_govsource_underlying',year,'.csv')))
   #(distance at which correct matches become the norm: 0.251)
@@ -76,6 +76,7 @@ for(year in years){
   #convert postal code to character
   poll_struct_key_govsource$PostalCode<-as.character(poll_struct_key_govsource$PostalCode)
   # join catholic church locations to polling locations
+  ## Many to many because there can be multiple churches per post code
   poll_struct_key_govsource<-left_join(poll_struct_key_govsource,temp, 
                                          by=c('Description','PostalCode'),
                                          relationship = "many-to-many")
