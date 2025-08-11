@@ -12,6 +12,8 @@ library(stringr) #string manipulation
 ## create address from address components
 make_address <- function(data, num, direction, street, street_type, city,
                          state, postcode){
+  #Replace null prefix with NA
+  data[[direction]][data[[direction]]=='NULL']<-NA
   data[['address']]<-paste0(data[[num]], ' ',data[[direction]], ' ',data[[street]], 
                             ' ',data[[street_type]], ', ',data[[city]], ', ', 
                             data[[state]],' ', data[[postcode]])
@@ -151,16 +153,31 @@ rep_str <- c(' STREET'=' ST', ' ROAD'=' RD', ' AVENUE'=' AVE', ' DRIVE'=' DR',
              ' NORTH'=' N', ' SOUTH'=' S', ' EAST'=' E', ' WEST'=' W')
 
 # get poll location data and process
-filenames<-c('Polling Place List 20180514.csv','Polling Place List 20190513.csv',
-             'Polling Place List 20201102.csv'#,'Polling Place List 20211101.csv',
+filenames<-c('Polling Place List 20161114.csv'
+             ,'Polling Place List 20171106.csv'
+             #'Polling Place List 20180514.csv','Polling Place List 20190513.csv',
+             #'Polling Place List 20201102.csv'#,'Polling Place List 20211101.csv',
              #'Polling Place List 20220506.csv','Polling Place List 20231106.csv'
              )
 ## Read in and process multiple location files
+### Get poll location data and make address variable 
 for(file in filenames){
+  if(substr(file,20,23)=='2016'){
     assign(paste0('poll_loc',substr(file,20,23)),
-           get_poll(poll_dir, file, num='HouseNum', direction='PrefixDirection',
-                    street='Street', street_type = 'StreetType',city='City',
-                    state="State", postcode='PostalCode'))
+           #2016 variable names
+           get_poll(poll_dir, file, num='HouseNum', direction='PrefixDirectionDesc',
+                    street='Street', street_type = 'StreetTypeDesc',city='City',
+                    state="StateDesc", postcode='PostalCode')
+    )
+  }
+  else{
+    assign(paste0('poll_loc',substr(file,20,23)),
+           #post 2016 variable names
+    get_poll(poll_dir, file, num='HouseNum', direction='PrefixDirection',
+             street='Street', street_type = 'StreetType',city='City',
+             state="State", postcode='PostalCode')
+    )
+    }
 }
 
 ##### Structure data
@@ -282,8 +299,10 @@ structures<-structures[complete.cases(structures),]
 
 ############# merge
 ### put dataframes into a list
-poll_dfs<-list('2018'=poll_loc2018, '2019'=poll_loc2019,
-               '2020'=poll_loc2020#, '2021'=poll_loc2021, 
+poll_dfs<-list('2016'=poll_loc2016
+               , '2017'=poll_loc2017
+               #'2018'=poll_loc2018, '2019'=poll_loc2019,
+               #'2020'=poll_loc2020#, '2021'=poll_loc2021, 
                #'2022'=poll_loc2022, '2023'=poll_loc2023
                )
 # join poll locations to structures matrix on address
@@ -296,8 +315,10 @@ for(i in seq_along(poll_dfs)){
   assign(paste0('poll_struct',names(poll_dfs)[i]),temp)
 }
 ### put dataframes into a list again
-poll_struct_dfs<-list('2018'=poll_struct2018, '2019'=poll_struct2019,
-               '2020'=poll_struct2020#, '2021'=poll_struct2021, 
+poll_struct_dfs<-list('2016'=poll_struct2016
+                      , '2017'=poll_struct2017
+                      #'2018'=poll_struct2018, '2019'=poll_struct2019,
+               #'2020'=poll_struct2020#, '2021'=poll_struct2021, 
                #'2022'=poll_struct2022, '2023'=poll_struct2023
                )
 
@@ -346,8 +367,8 @@ for(i in seq_along(poll_struct_dfs)){
   print(paste0('Missingness: ',sum(is.na(temp$location_category))))
   ####### save to csv
   #set directory
-  #setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
-  #write.csv(temp, paste0('poll_struct_govsource_underlying',names(poll_struct_dfs)[i],'.csv'))
+  setwd('C:/Users/natha/Desktop/Polling Places DiD/data')
+  write.csv(temp, paste0('poll_struct_govsource_underlying',names(poll_struct_dfs)[i],'.csv'))
 }
 
 #calc missingness by checking which addresses are in structure list
