@@ -9,7 +9,7 @@ import os
 
 ############# Convert FVE files to Census geocoding format
 ## file names
-years = ['2018','2019','2020','2021','2022','2023']
+years = ['2016','2017']
 # create list of paths to FVE files
 pollpath = 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places/'
 pollfiles = [i for i in os.listdir(pollpath) if os.path.isfile(os.path.join(pollpath,i)) and
@@ -20,10 +20,13 @@ pollfilepaths = [pollpath + file for file in pollfiles]  # add path to file name
 # counter to keep track of years
 i = 0
 # for loop reading and reformating
-for file in pollfilepaths:
+for file in pollfilepaths[1:2]:
     data = pd.read_csv(file)  # read in file
     #break out address into street number, name, city, state, Zip
     num = data['HouseNum']
+    #2016 variable names
+    #street = data['PrefixDirectionDesc'].fillna('')+' '+data['Street'].fillna('')+' '+data['StreetTypeDesc'].fillna('')+' '+data['SuffixdirectionDesc'].fillna('')
+    # Post 2016 variable names
     street = data['PrefixDirection'].fillna('')+' '+data['Street'].fillna('')+' '+data['StreetType'].fillna('')+' '+data['SuffixDirection'].fillna('')
     city = data['City']
     state = pd.Series('PA', index=np.arange(len(data)))
