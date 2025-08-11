@@ -12,7 +12,7 @@ import requests # to interact with API
 os.chdir('C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\gov_poll_places geocoded')
 
 #create years names list
-years = ['2018','2019','2020','2021','2022','2023']
+#years = ['2018','2019']
 
 #use geocoder API to geocode
 ## path to FVEs for geocoding
