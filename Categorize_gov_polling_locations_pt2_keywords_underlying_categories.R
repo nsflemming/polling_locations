@@ -140,8 +140,9 @@ poll_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places'
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 struct_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/Structures'
 # get poll location data and process
-filenames<-c('poll_struct_govsource_underlying2018.csv', 'poll_struct_govsource_underlying2019.csv',
-             'poll_struct_govsource_underlying2020.csv'#, 'poll_struct_govsource2021.csv',
+filenames<-c('poll_struct_govsource_underlying2016.csv', 'poll_struct_govsource_underlying2017.csv'
+             #,'poll_struct_govsource_underlying2018.csv', 'poll_struct_govsource_underlying2019.csv'
+             #,'poll_struct_govsource_underlying2020.csv'#, 'poll_struct_govsource2021.csv',
              #'poll_struct_govsource2022.csv', 'poll_struct_govsource2023.csv'
              )
 for(file in filenames){
@@ -154,8 +155,9 @@ for(file in filenames){
          'Description')))
 }
 
-poll_dfs<-list('18'=poll_loc2018,'19'=poll_loc2019,
-               '20'=poll_loc2020#,'21'=poll_loc2021,
+poll_dfs<-list('16'=poll_loc2016,'17'=poll_loc2017
+               #,'18'=poll_loc2018,'19'=poll_loc2019
+               #,'20'=poll_loc2020#,'21'=poll_loc2021,
             #'22'=poll_loc2022,'23'=poll_loc2023
             )
 
