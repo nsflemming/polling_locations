@@ -29,7 +29,8 @@ geo<-read.csv(paste0(data_dir,'\\gov_poll_places geocoded\\geocoderesult_',year,
               header = F)
 
 ### read in poll location file
-poll<-read.csv(paste0(data_dir,'\\poll_struct_key_govsource',substring(year,3,4),'.csv'))
+#poll<-read.csv(paste0(data_dir,'\\poll_struct_key_govsource',substring(year,3,4),'.csv'))
+poll<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource_underlying',substring(year,3,4),'.csv'))
 
 ### remove commas from addresses (2019 addresses have weird zipcodes too)
 geo$address<-str_remove_all(geo$V2, pattern = "\\,")
