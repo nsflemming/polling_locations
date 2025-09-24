@@ -12,13 +12,15 @@ library(stringr) #string manipulation
 ## create address from address components
 make_address <- function(data, num, direction, street, street_type, city,
                          state, postcode){
-  #Replace null prefix with NA
-  data[[direction]][data[[direction]]=='NULL']<-NA
+  #Replace null prefix with a blank space
+  data[[direction]][data[[direction]]=='NULL']<-''
+  #Replace null postcode with a blank space
+  data[[postcode]][data[[postcode]]=='NULL']<-''
   data[['address']]<-paste0(data[[num]], ' ',data[[direction]], ' ',data[[street]], 
                             ' ',data[[street_type]], ', ',data[[city]], ', ', 
                             data[[state]],' ', data[[postcode]])
-  #replace any douple spaces created by a missing direction with a single space
-  data[['address']]<-str_replace_all(data[['address']], '  ', ' ')
+  #replace any double or more spaces created by a missing direction, etc. with a single space
+  data[['address']]<-str_replace_all(data[['address']], '  +', ' ')
   return(data)
 }
 
@@ -364,6 +366,7 @@ for(i in seq_along(poll_struct_dfs)){
   #                              postoffice,
   #                              policestation,courthouse,
   #                              library))
+  # Calculate missingness
   print(paste0('Missingness: ',sum(is.na(temp$location_category))))
   ####### save to csv
   #set directory
