@@ -9,7 +9,7 @@ import os
 
 ############# Convert FVE files to Census geocoding format
 ## file names
-years = ['2016','2017']
+years = ['2017']
 # create list of paths to FVE files
 pollpath = 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places/'
 pollfiles = [i for i in os.listdir(pollpath) if os.path.isfile(os.path.join(pollpath,i)) and

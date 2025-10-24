@@ -269,9 +269,9 @@ plot_data<-left_join(voterloc_data, rural_data, by=c('FIPS'='State_County_Tract_
 ## merge in state ids
 plot_data<-left_join(plot_data, crosswalk, by='LALVOTERID')
 ### Merge location categories into plotting data
-mini<-poll_data%>%
-  select(c(VOTERID,location_category))
-plot_data<-left_join(plot_data, mini, by=c('Voters_StateVoterID'='VOTERID'))
+# mini<-poll_data%>%
+#   select(c(VOTERID,location_category))
+# plot_data<-left_join(plot_data, mini, by=c('Voters_StateVoterID'='VOTERID'))
 
 
 ## summarize plotting data
@@ -299,4 +299,7 @@ ggplot(plot_data_summ, aes(x=fct_reorder(location_category, prop_voters), y=prop
         axis.text.y = element_text(size=12),
         strip.text = element_text(size=13))+
   facet_wrap(~metropolitan, nrow=2)
+
+
+### Plot proportion of polling locations that changed by urban vs. rural
 

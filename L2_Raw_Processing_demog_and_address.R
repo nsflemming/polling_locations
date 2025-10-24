@@ -80,9 +80,9 @@ data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
 #L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
-L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
-#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
-year=2018
+#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
+L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
+year=2017
 
 # Set variable lists
 ## adjust as needed based on variable names in data
@@ -129,10 +129,10 @@ demog_vars17<-c('LALVOTERID', 'Voters_StateVoterID',
 
 
 # Read in data
-#L2demog<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', 
-#                     demog_vars17)
-L2demog<-get_L2_data(L2_dir, 'VM2--PA--2018-08-22-DEMOGRAPHIC.tab', 
-                     demog_vars18)
+L2demog<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', 
+                     demog_vars17)
+#L2demog<-get_L2_data(L2_dir, 'VM2--PA--2018-08-22-DEMOGRAPHIC.tab', 
+#                     demog_vars18)
 ## race estimates
 ### (2018 has two rows for LALPA182948529)
 #race19<-read.csv(paste0(race_data_dir,'\\pa2019.csv'))
@@ -161,7 +161,8 @@ rm(race)
 
 ####################### Process L2 data to more usable forms
 # Convert income to numeric
-L2demog<-dollar_to_num(L2demog, 'CommercialData_EstimatedHHIncomeAmount')
+#L2demog<-dollar_to_num(L2demog, 'CommercialData_EstimatedHHIncomeAmount')
+L2demog<-dollar_to_num(L2demog, 'CommercialData_EstimatedIncomeAmount')
 # Convert education to ordinal
 ## level to numeric map
 educ_map <- c("Less than HS Diploma - Ex Like"=1,
