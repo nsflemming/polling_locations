@@ -23,7 +23,7 @@ pad_code<-function(df, code_var,county_var, counties, code_length){
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 FVE_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\FVE_csvs'
 ### set year
-year='2019'
+year='2017'
 
 ### read in processed voterfile
 VF<-read.csv(paste0(FVE_dir,'\\FVE_',year,'.csv'))

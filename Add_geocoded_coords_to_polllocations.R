@@ -22,7 +22,7 @@ pad_code<-function(df, code_var,county_var, counties, code_length){
 ### set directories
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 ### set year
-year='2016'
+year='2017'
 
 ### read in geocoded file
 geo<-read.csv(paste0(data_dir,'\\gov_poll_places geocoded\\geocoderesult_',year,'_poll_locations_10000.csv'), 
