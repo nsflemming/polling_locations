@@ -1,5 +1,5 @@
 #Nathaniel Flemming
-# 26/8/24
+# 15/9/25
 
 # Difference in difference regressions, using data created by DiD_preprocessing script
 # Propensity score matching done manually
@@ -9,7 +9,10 @@
 library(tidyverse) #convenience
 library(data.table) #read in data selectively
 library(stringr) #id string manipulation
-
+#library(psa) #all in on propensity score analysis package (no version for my version of R?)
+library(MatchIt) #matching for DiD
+#library(PSAgraphics)
+library(marginaleffects) #estimates effects with robust standard errors
 
 ########## Functions
 ###
@@ -194,7 +197,7 @@ var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
             'Shape_Length'='Distance to Polling Station','known_catholic'='Known Catholic')
 
 ## Calculate years registered based on dependent variable year
-model_data$years_reg<-2018-as.numeric(model_data$year_reg)
+model_data$years_reg<-2017-as.numeric(model_data$year_reg)
 
 ## Common set of covariates
 common_covars <-c(
@@ -240,17 +243,13 @@ model_data$known_religious<-as.factor(model_data$known_religious)
 model_data$known_catholic<-as.factor(model_data$known_catholic)
 #child present
 model_data$has_child<-as.factor(model_data$has_child)
-#government employee
-#model_data$known_gov_emp <- ifelse(model_data$CommercialData_OccupationIndustry=="Civil Servant",TRUE,FALSE)
-#model_data$known_gov_emp<-as.factor(model_data$known_gov_emp)
 #union member
 model_data$CommercialData_LikelyUnion<-as.factor(model_data$CommercialData_LikelyUnion)
-#occupational group
+#occupational group (Not a variable in 2017 data, so have to remove if using that year)
 model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
 model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
 
-### create indicators for ever being treated
-#two_data<-two_data%>%
+### Create treatment indicators
 two_data<-model_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
@@ -260,9 +259,10 @@ two_data<-model_data%>%
          ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0))%>% 
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
-  mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)),
-         ## Calculate years registered by 2018
-         years_reg = 2018-as.numeric(year_reg))%>%
+ #mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)),
+  mutate(voted = ((year==2017 & General_2017_11_07==1)|(year==2019 & General_2019_11_05==1)),
+         ## Calculate years registered by 2017
+         years_reg = 2017-as.numeric(year_reg))%>%
   ungroup()%>%
   #remove duplicate voters (not sure where they came from)
   distinct(LALVOTERID, year, .keep_all = T)
@@ -270,262 +270,211 @@ two_data<-model_data%>%
 #two_data$voted[is.na(two_data$voted)]<-F
 
 ###### Split location category into years
-two_data$location_category_2018<-two_data$location_category
-two_data$location_category_2018[two_data$year==2019]<-NA
+two_data$location_category_2017<-two_data$location_category
+two_data$location_category_2017[two_data$year==2019]<-NA
 two_data$location_category_2019<-two_data$location_category
-two_data$location_category_2019[two_data$year==2018]<-NA
+two_data$location_category_2019[two_data$year==2017]<-NA
 
-############ testing data
-## order by voterid
-# two_data <- two_data[order(two_data$VOTERID),]
-# mini_data<-two_data[1:500000,]
-# 
-# rigged_data<-two_data[1:1000000,c('VOTERID','voted','General_2019_11_05','ever_changed_precinct','year')]
-#changed_prec<- rbinom(500000,0:1,.015)
-#changed_prec<-rep(changed_prec,each=2)
-#rigged_data$ever_changed_precinct<-changed_prec
-#prob_vote<-runif(n=1000000,min=0,max=1)
-#normal_probs <- pmax(pmin(rnorm(1000000, mean = 0.3771259, sd = 0.4846669), 1), 0)
-#rigged_data$General_2019_11_05<-round(rigged_data$ever_changed_precinct*0.002+normal_probs, digits=0)
-#rigged_data$General_2019_11_05<-round(prob_vote, digits=0)
-# out0 <- drdid(yname = "voted", #outcome
-#               dname = "ever_changed_precinct", #treatment group 
-#               idname = "VOTERID", #respondent
-#               tname = "year",
-#               data = rigged_data)
-# out0
 
-################ subset for change in poll category/location test
-### people who changed polling location for whatever reason
-ecp_two_data<-two_data%>%
-  filter(ever_changed_poll_loc==T)
-
-### people who changed polling location by moving and people who didn't change location
-no_chng_or_mv_two_data<-two_data%>%
-  filter(((ever_moved_new_poll_loc==T)|(ever_changed_poll_loc==F))&(ever_no_move_new_poll_loc==F))
-
-### people who changed polling location by moving and people who didn't change location
+######## Generate propensity scores
+### new poll location without moving
+dvar<-'ever_no_move_new_poll_loc'
+### people who changed polling location without moving and people who didn't change location
 no_chng_or_no_mv_two_data<-two_data%>%
   filter(((ever_no_move_new_poll_loc==T)|(ever_changed_poll_loc==F))&(ever_moved_new_poll_loc==F))
 
-
-########################### subsets for general knowledge tests 
-### people who changed polling location to a well known building 
-ecp_wellknown_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # new poll location is well known
-    new_poll_wellknown = sum((((location_category=='library')|
-                                 (location_category=='public')|
-                                 (location_category=='public_justice')
-                               |(location_category=='school')
-                               #|#(location_category=='relig_school')
-    )&
-      (year==2019)),na.rm=T)>0
-  )%>%
-  ungroup()
-
-########################### subsets for specific knowledge tests 
-### Parents who changed polling station
-voters_parents_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only parents
-  filter(has_child==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # Whether new polling location is a school
-    parent_new_poll_school = sum(((location_category=='school')&(year==2019)),
-                                 na.rm=T)>0
-  )%>%
-  ungroup()
-
-
-### catholic people who changed polling station
-voters_cath_two_data<-two_data%>%
-  # only people who have changed polling location
-  filter(ever_changed_poll_loc==T)%>%
-  # only religious people
-  filter(known_catholic==T)%>%
-  group_by(LALVOTERID)%>%
-  mutate(
-    # Whether new polling location is catholic
-    cath_new_poll_cath = sum((((location_category=='catholic_church')|
-                                 (location_category=='catholic_school'))&
-                                (year==2019)),
-                             na.rm=T)>0
-  )%>%
-  ungroup()
-
-###################################### DiD ###########
-# ######## Estimating Group-Time Average Treatment Effect, 2-periods
-#covariates, must be time invariant
-### setting covariates to value at first time point to make them invariant (just for testing purposes)
-### Reminder to probably not include covariates that could be post-treatment, i.e. affected by changing precinct
-# two_data<-two_data%>%
-#   group_by(VOTERID)%>%
-#   mutate(Voters_Gender = Voters_Gender[1])
-
-ever_chng_loc <- c("ever_changed_poll_loc","ever_moved_new_poll_loc",
-                   'ever_no_move_new_poll_loc','ever_moved_old_poll_loc')
-chng_to<-c('changed_to_school','changed_to_cath','changed_to_wellknown',
-           'parent_changed_to_school','cath_changed_to_cath') 
-new_poll<-c('new_poll_school','parent_new_poll_school','new_poll_cath','cath_new_poll_cath',
-            'new_poll_wellknown')
-
-############ Convert treatment indicators to numeric
-two_data['ever_changed_poll_loc'] <- sapply(two_data['ever_changed_poll_loc'],as.numeric)
-# reason<-c('ever_moved_new_poll_loc','ever_no_move_new_poll_loc')
-# ecp_two_data[reason] <- sapply(ecp_two_data[reason],as.numeric)
-no_chng_or_mv_two_data['ever_moved_new_poll_loc']<-
-  sapply(no_chng_or_mv_two_data['ever_moved_new_poll_loc'],as.numeric)
-no_chng_or_no_mv_two_data['ever_no_move_new_poll_loc']<-
-  sapply(no_chng_or_no_mv_two_data['ever_no_move_new_poll_loc'],as.numeric)
-
-ecp_wellknown_two_data['new_poll_wellknown']<- sapply(ecp_wellknown_two_data['new_poll_wellknown'],as.numeric)
-ecp_wellknown_two_data$voted<-as.numeric(ecp_wellknown_two_data$voted)
-
-voters_parents_two_data['parent_new_poll_school'] <- sapply(voters_parents_two_data['parent_new_poll_school'],as.numeric)
-voters_parents_two_data$voted<-as.numeric(voters_parents_two_data$voted)
-
-voters_cath_two_data['cath_new_poll_cath'] <- sapply(voters_cath_two_data['cath_new_poll_cath'],as.numeric)
-voters_cath_two_data$voted<-as.numeric(voters_cath_two_data$voted)
-
-#mini<-ecp_two_data[order(ecp_two_data$LALVOTERID),]
-#mini<-mini[1:1000,]
-
-# for(col in reason){
-#   print(col)
-#   out0 <- drdid(yname = "voted", #outcome
-#                 dname = col, #treatment group 
-#                 idname = "VOTERID", #respondent
-#                 tname = "year",
-#                 #xformla = ~Voters_Gender, 
-#                 data = ecp_two_data)
-#   out0
-#   # save model summary
-#   setwd(results_dir)
-#   sink(paste0(col,"_ecp_subset_DRDiD_model_summary.txt"))
-#   print(out0)
-#   sink()
-# }
-
-#### DiD Regression
-dvar<-'ever_no_move_new_poll_loc'
 # remove missing to prevent different length Y1 and Y0
-mini<-no_chng_or_no_mv_two_data%>%
+## Test with subsample
+no_chng_or_no_mv_two_data<-no_chng_or_no_mv_two_data%>%
   select(all_of(c('voted',dvar,'LALVOTERID','VOTERID','year'
                   ,'Voters_Gender'
                   ,'Voters_Age','Parties_Description','pred_race',
                   'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
-                  'known_religious','CommercialData_LikelyUnion','CommercialData_OccupationGroup',
+                  'known_religious','CommercialData_LikelyUnion',
                   'years_reg'
   )))%>%
   filter(complete.cases(.))%>%
-  #filter out voters who aren't in both 2018 and 2019?
+  #filter out voters who aren't in both 2017 and 2019?
   group_by(LALVOTERID)%>%
   filter(length(year)==2)%>%
   ungroup()
 
-# fix covariates at 2018 values
-## Filter data for year 2018
-mini_2018 <- mini %>%
-  filter(year == 2018) %>%
-  select(LALVOTERID, Voters_Gender, Voters_Age, Parties_Description, pred_race, 
-         CommercialData_EstimatedHHIncomeAmount, Residence_Families_HHCount, 
-         known_religious, CommercialData_LikelyUnion, CommercialData_OccupationGroup, years_reg)
+
+# # Create a mini dataframe for testing by sampling from treated and untreated groups
+mini<-no_chng_or_no_mv_two_data%>%
+  group_by('ever_no_move_new_poll_loc')%>%
+  slice_sample(n=500000)%>%
+  ungroup()%>%
+  mutate(treat=as.integer(ever_no_move_new_poll_loc),
+         Voters_Gender=case_when(
+           Voters_Gender=='M' ~ 0,
+           Voters_Gender=='F'~1,
+           .default = NA
+         ),
+         Voters_Age=as.integer(Voters_Age),
+         Parties_Description=as.integer(Parties_Description),
+         pred_race=as.integer(pred_race),
+         known_religious=as.integer(known_religious),
+         CommercialData_LikelyUnion=as.integer(CommercialData_LikelyUnion)
+         #CommercialData_OccupationGroup=as.integer(CommercialData_OccupationGroup)
+  )
+
+# full<-no_chng_or_no_mv_two_data%>%
+#   mutate(treat=as.integer(ever_no_move_new_poll_loc),
+#          Voters_Gender=case_when(
+#            Voters_Gender=='M' ~ 0,
+#            Voters_Gender=='F'~1,
+#            .default = NA
+#          ),
+#          Voters_Age=as.integer(Voters_Age),
+#          Parties_Description=as.integer(Parties_Description),
+#          pred_race=as.integer(pred_race),
+#          known_religious=as.integer(known_religious),
+#          CommercialData_LikelyUnion=as.integer(CommercialData_LikelyUnion)
+#          #CommercialData_OccupationGroup=as.integer(CommercialData_OccupationGroup)
+#   )
+
+
+# fix covariates at 2017 values
+## Filter data for year 2017
+mini_2017 <- mini %>%
+  filter(year == 2017) %>%
+  select(all_of(c('LALVOTERID', 'Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'years_reg')))
 ## Join back to the original dataset
 mini <- mini %>%
-  left_join(mini_2018, by = "LALVOTERID", suffix = c("", "_2018")) %>%
+  left_join(mini_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
   mutate(
-    Voters_Gender = Voters_Gender_2018,
-    Voters_Age = Voters_Age_2018,
-    Parties_Description = Parties_Description_2018,
-    pred_race = pred_race_2018,
-    CommercialData_EstimatedHHIncomeAmount = CommercialData_EstimatedHHIncomeAmount_2018,
-    Residence_Families_HHCount = Residence_Families_HHCount_2018,
-    known_religious = known_religious_2018,
-    CommercialData_LikelyUnion = CommercialData_LikelyUnion_2018,
-    CommercialData_OccupationGroup = CommercialData_OccupationGroup_2018,
-    years_reg = years_reg_2018
-  ) %>%
-  select(-ends_with("_2018"))  # Remove extra columns
+    Voters_Gender = Voters_Gender_2017,
+    Voters_Age = Voters_Age_2017,
+    Parties_Description = Parties_Description_2017,
+    pred_race = pred_race_2017,
+    CommercialData_EstimatedHHIncomeAmount = CommercialData_EstimatedHHIncomeAmount_2017,
+    Residence_Families_HHCount = Residence_Families_HHCount_2017,
+    known_religious = known_religious_2017,
+    CommercialData_LikelyUnion = CommercialData_LikelyUnion_2017,
+    #CommercialData_OccupationGroup = CommercialData_OccupationGroup_2017,
+    years_reg = years_reg_2017
+  )%>%
+  select(-ends_with("_2017"))%>%  # Remove extra columns
+  # Remove voters who have missing data
+  filter(complete.cases(.))
+
+# Logistic Regression based scores
+## Change in polling location without moving
+ps_formula <- treat ~ Voters_Gender + Voters_Age + Parties_Description+
+  pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+  known_religious+CommercialData_LikelyUnion+
+  years_reg
+lr_out <- glm(formula = ps_formula,
+              data = mini,
+              family = binomial(link = 'logit'))
+
+## Add propensity scores to data frame
+mini$lr_ps <- fitted(lr_out)
+
+## Examine distribution of propensity scores
+ggplot(full, aes(x = lr_ps, color = as.logical(ever_no_move_new_poll_loc))) + 
+  geom_density() +
+  guides(col=guide_legend(title='Treated'))+
+  xlab('Propensity Score')
+
+# Stratify into quintiles and convert all variables to numeric
+full <- full %>%
+  mutate(ps_quintile = ntile(lr_ps, 5))
+
+# Get the actual quintile cutpoints
+quintile_cutpoints <- quantile(mini$lr_ps, probs = seq(0, 1, 0.2))
+
+## Check stratification
+table(mini$treat, mini$ps_quintile)
+## Visalize quantiles
+ggplot(mini, aes(x = lr_ps, color = as.logical(treat))) + 
+  geom_density() +
+  guides(col=guide_legend(title='Treated'))+
+  xlab('Propensity Score')+
+  geom_vline(xintercept = quintile_cutpoints)
+
+# Check balance
+## Simple comparison of means within strata
+PSAgraphics::box.psa(continuous = mini$years_reg, 
+                     treatment = mini$treat, 
+                     strata = mini$ps_quintile,
+                     xlab = "Strata", 
+                     balance = FALSE)
+## Simple comparison of proportions within strata
+PSAgraphics::cat.psa(categorical = mini$CommercialData_OccupationGroup, 
+                     treatment = mini$ever_no_move_new_poll_loc, 
+                     strata = mini$ps_quintile, 
+                     xlab = 'Strata',
+                     balance = FALSE)
+
+## Compare covariate effect size to check balance
+covars <- c('treat','Voters_Gender','Voters_Age', 
+            'Parties_Description','pred_race',
+            'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+              'known_religious','CommercialData_LikelyUnion',
+            #'CommercialData_OccupationGroup',
+              'years_reg')
+covars <- data.frame(full[,covars[-1]])
+#All variables must be numeric for the function to work
+PSAgraphics::cv.bal.psa(covariates = covars, 
+                        treatment = full$treat,
+                        propensity = full$lr_ps,
+                        strata = full$ps_quintile)
+
+
+########## DiD
+# Matching from bryer book
+
+# Matching using MatchIt package
+## Mahalanobis Metric Matching
+### matches observation to nearest, not exact match
+m.mahal<-matchit(ps_formula,data=mini, replace=FALSE,distance="mahalanobis")
+summary(m.mahal)
+# Check balance
+library(cobalt)
+love.plot(m.mahal, drop.distance = TRUE)
+## Convert match object into a dataset
+mahal.match<-match.data(m.mahal)
+## t-test comparing outcome
+t.test(voted ~ treat, data = mahal.match)
+
+#Linear model with covariates (covariates not necessarily needed if balance is good enough)
+fit1 <- glm(voted ~ treat * (Voters_Gender+Voters_Age+Parties_Description+pred_race+
+                               CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                               known_religious+CommercialData_LikelyUnion+years_reg),
+              data = mahal.match,
+              family = binomial(link = 'logit'),
+            weights = weights)
+#estimate ATT
+avg_comparisons(fit1,
+                variables = "treat",
+                # I think this variable determines the clustering of the errors?:
+                ## "this formula is passed to the cluster argument of the sandwich::vcovCL function"
+                ## Clustering on matches created by prop score matching
+                vcov = ~subclass,
+                newdata = subset(treat == 1),
+                # Calculate relative risk
+                comparison = "lnratioavg",
+                transform = "exp")
+## PSM nearest neighbor
+##m.nn<-matchit(lalonde.formu, data = lalonde, caliper=0.1, method ="nearest")
+m.nn<-matchit(ps_formula, data = mini, ratio = 1, method ="nearest")
+nn.match<-match.data(m.nn)
 
 
 
 
-##### Package DID
-# out1 <- drdid(yname = "voted", #outcome
-#               dname = dvar, #treatment group
-#               idname = "VOTERID", #respondent
-#               tname = "year",
-#               xformla = ~Voters_Gender+Voters_Age+Parties_Description+pred_race+
-#                 CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
-#                 known_religious+CommercialData_LikelyUnion+CommercialData_OccupationGroup+
-#                 years_reg,
-#               data = mini)
-# out1
-# ## save model summary
-# setwd(results_dir)
-# sink(paste0(dvar,'_DRDiD_matched_on_covars_',other_cond,'model_summary.txt'))
-# print(out1)
-# sink()
-
-# plot results
-title = 'ATET of Changing Polling Location to a \nCatholic Church vs. Another Building for Catholics'
-groups = c('Non-Catholic Church', 'Parallel Trend', 'Catholic Church')
-plot_did(data=mini, did_model=out1, dvar=dvar, 
-         plot_title=title,
-         group1=groups[1], group2=groups[2],group3=groups[3])
-# blank plot
-# blank_plot_did(data=use_data, did_model=out0, dvar=dvar, 
-#                plot_title=title,
-#                group1=groups[1], group2=groups[2],group3=groups[3])
 
 
-######################### Multiperiod
-library(did)
 
-#### Event study
-#reformat data for multi periods (1 row per year from 2016 to 2019)
-gvar<-'cath_new_poll_cath'
-mini<-voters_cath_two_data%>%
-  select(c('General_2016_11_08','General_2017_11_07','General_2018_11_06',
-           'General_2019_11_05',
-           'voted',gvar,'LALVOTERID','VOTERID','year'
-           #covariates
-           ,'Voters_Gender'
-           ,'Voters_Age','Parties_Description','pred_race',
-           'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
-           #'known_religious',
-           'CommercialData_LikelyUnion','CommercialData_OccupationGroup',
-           'years_reg'))%>%
-  mutate(cath_new_poll_cath=ifelse(cath_new_poll_cath==1,2019,0))%>%
-  rowwise() %>%
-  slice(rep(1, 2)) %>%
-  group_by(LALVOTERID) %>%
-  mutate(year = seq(2016, by = 1, length.out = n()),
-         voted = ((year==2016 & General_2016_11_08==1)|(year==2017 & General_2017_11_07==1)|
-                    (year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)))
 
-did.att.gt <- att_gt(yname = "voted",
-                     tname = "year",
-                     idname = "VOTERID",
-                     gname = gvar,
-                     xformla = ~Voters_Gender+Voters_Age+Parties_Description+pred_race+
-                       CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
-                       #known_religious+
-                       CommercialData_LikelyUnion+CommercialData_OccupationGroup+
-                       years_reg,
-                     data = mini
-)
-summary(did.att.gt)
-## save model summary
-setwd(results_dir)
-sink(paste0(gvar,'_mpdid_matched_on_covars_',other_cond,'model_summary.txt'))
-print(did.att.gt)
-sink()
-# plot them
-ggdid(did.att.gt)
+
+
+
+
