@@ -162,7 +162,7 @@ test18<-test%>%
 
 test19<-test%>%
   filter(year==2019)%>%
-select(LALVOTERID, VOTERID, location_category)
+  select(LALVOTERID, VOTERID, location_category)
 
 test_both<-left_join(test18,test19, by = "LALVOTERID", suffix = c("", "_2018"))
 sum(test_both$location_category!=test_both$location_category_2018, na.rm = T)
@@ -176,13 +176,13 @@ two_data<-model_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
   mutate(#ever_changed_poll_cat=(sum(changed_poll_cat)>0),
-         ever_changed_poll_loc=(sum(changed_poll_loc)>0),
-         #ever_moved_new_poll_cat=(sum(moved_new_poll_cat)>0),
-         #ever_no_move_new_poll_cat=(sum(no_move_new_poll_cat)>0),
-         #ever_moved_old_poll_cat=(sum(moved_old_poll_cat)>0),
-         ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
-         ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0),
-         ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0))%>% 
+    ever_changed_poll_loc=(sum(changed_poll_loc)>0),
+    #ever_moved_new_poll_cat=(sum(moved_new_poll_cat)>0),
+    #ever_no_move_new_poll_cat=(sum(no_move_new_poll_cat)>0),
+    #ever_moved_old_poll_cat=(sum(moved_old_poll_cat)>0),
+    ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
+    ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0),
+    ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0))%>% 
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
   mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)),
