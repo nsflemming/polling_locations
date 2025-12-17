@@ -47,19 +47,21 @@ race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_r
 ### Need to use subsequent year for general election of polling location data year
 #L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
 #L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
+L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
 
 #set polling location data year
-poll_year=2017
+poll_year=2019
 
 # Set variable lists
 demog_vars<-c('LALVOTERID','Voters_StateVoterID','County','Voters_FIPS','Precinct')
 
 # Read in data
-L2loc<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', demog_vars)
+L2loc<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+
 
 ################# merge L2 data with polling location data
 # Read in location/category data
-poll <- get_poll_data(data_dir, paste0('FVE_',poll_year,'_polllocation.csv'), 
+poll <- get_poll_data(data_dir, paste0('FVE_',poll_year,'_polllocation_underlying.csv'), 
                       c('VOTERID','County', 'PrecinctName', 'location_category',
                         'Description'))
 ### Replace '-' in L2 precinct names to better match government format
@@ -83,9 +85,11 @@ write.csv(merged, paste0('L2PA_poll_loc_VM2_',str_sub(year_str,start=-2),'.csv')
 ######################### Extract voterhistory
 # Set variable lists
 ## adjust as needed based on elections of interest/contained in L2 file
-vote_vars<-c('LALVOTERID','General_2016_11_08','General_2017_11_07',
-            'General_2018_11_06')
-#,'General_2019_11_05')
+vote_vars<-c('LALVOTERID',
+             #'General_2016_11_08',
+             'General_2017_11_07'
+            #'General_2018_11_06')
+            ,'General_2019_11_05')
 #vote_vars<-c('LALVOTERID','General_2017_11_07')
 #set polling location data year
 poll_year=2019
