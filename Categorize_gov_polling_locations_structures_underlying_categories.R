@@ -155,9 +155,10 @@ rep_str <- c(' STREET'=' ST', ' ROAD'=' RD', ' AVENUE'=' AVE', ' DRIVE'=' DR',
              ' NORTH'=' N', ' SOUTH'=' S', ' EAST'=' E', ' WEST'=' W')
 
 # get poll location data and process
-filenames<-c('Polling Place List 20161114.csv'
-             ,'Polling Place List 20171106.csv'
-             #'Polling Place List 20180514.csv','Polling Place List 20190513.csv',
+filenames<-c(#'Polling Place List 20161114.csv'
+             #,'Polling Place List 20171106.csv'
+             #'Polling Place List 20180514.csv',
+             'Polling Place List 20190513.csv'
              #'Polling Place List 20201102.csv'#,'Polling Place List 20211101.csv',
              #'Polling Place List 20220506.csv','Polling Place List 20231106.csv'
              )
@@ -301,9 +302,10 @@ structures<-structures[complete.cases(structures),]
 
 ############# merge
 ### put dataframes into a list
-poll_dfs<-list('2016'=poll_loc2016
-               , '2017'=poll_loc2017
-               #'2018'=poll_loc2018, '2019'=poll_loc2019,
+poll_dfs<-list(#'2016'=poll_loc2016
+               #, '2017'=poll_loc2017
+               #'2018'=poll_loc2018, 
+               '2019'=poll_loc2019
                #'2020'=poll_loc2020#, '2021'=poll_loc2021, 
                #'2022'=poll_loc2022, '2023'=poll_loc2023
                )
@@ -317,9 +319,10 @@ for(i in seq_along(poll_dfs)){
   assign(paste0('poll_struct',names(poll_dfs)[i]),temp)
 }
 ### put dataframes into a list again
-poll_struct_dfs<-list('2016'=poll_struct2016
-                      , '2017'=poll_struct2017
-                      #'2018'=poll_struct2018, '2019'=poll_struct2019,
+poll_struct_dfs<-list(#'2016'=poll_struct2016
+                      #, '2017'=poll_struct2017
+                      #'2018'=poll_struct2018, 
+                      '2019'=poll_struct2019
                #'2020'=poll_struct2020#, '2021'=poll_struct2021, 
                #'2022'=poll_struct2022, '2023'=poll_struct2023
                )
