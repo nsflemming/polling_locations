@@ -73,7 +73,7 @@ factorize_set_ref<-function(data, loc_cat, ref_cat){
 ### set directories
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 ### set year
-year='2018'
+year='2017'
 
 ## Create vector of location category labels
 loc_labels_NAsettoOther<-c('Public Location','Public/Justice Location','Other',
@@ -98,17 +98,20 @@ loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location'
 
 ############# Plot proportion of polling locations in each category
 ### read in poll location file
-poll_data18<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource_underlying18.csv'))%>%
+poll_data17<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying17.csv'))%>%
   select(c(location_category))
-poll_data19<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource_underlying19.csv'))%>%
+poll_data18<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying18.csv'))%>%
   select(c(location_category))
-poll_data20<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource_underlying20.csv'))%>%
+poll_data19<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying19.csv'))%>%
   select(c(location_category))
+# poll_data20<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying20.csv'))%>%
+#   select(c(location_category))
 ###combine years of poll data
+poll_data17$year<-2017
 poll_data18$year<-2018
 poll_data19$year<-2019
-poll_data20$year<-2020
-poll_data_all<-rbind(poll_data18,poll_data19,poll_data20)
+# poll_data20$year<-2020
+poll_data_all<-rbind(poll_data17,poll_data18,poll_data19)
 ## set how 'other category is treated
 #other_cond='OthersettoNA'
 other_cond='NAsettoOther'
@@ -137,6 +140,18 @@ poll_data_all<-poll_data_all%>%
 #                                                  'Multiple', 'Public', 'Public/Justice',
 #                                                  'Religious','Religious School','School')
 
+
+# Get table of locations with multiple categories
+multiple_categories<-poll_data_all%>%
+  group_by(year,location_category)%>%
+  summarize(num_locs=n())%>%
+  ungroup()%>%
+  filter(str_detect(location_category,".*/.*"))
+# write.csv(multiple_categories,
+#           paste0('C:\\Users\\natha\\Desktop\\Polling Places DiD\\plots\\Location Categories\\',
+#                  'Locations_with_Multiple_Categories_Table.csv'))
+
+
 # plot proportions
 ggplot(poll_data_all, aes(x=fct_reorder(location_category, prop_locs), y=prop_locs,
                  group=factor(year), fill=factor(year)))+
@@ -158,18 +173,21 @@ ggplot(poll_data_all, aes(x=fct_reorder(location_category, prop_locs), y=prop_lo
 ############ Plot Proportion of voters in each location category
 # voter poll location data
 #poll_data<-read.csv(paste0(data_dir,'\\FVE_',year,'_polllocation_underlying.csv'))
+poll_data17<-read.csv(paste0(data_dir,'\\FVE_2017_polllocation_underlying.csv'))%>%
+  select(c(location_category))
 poll_data18<-read.csv(paste0(data_dir,'\\FVE_2018_polllocation_underlying.csv'))%>%
   select(c(location_category))
 poll_data19<-read.csv(paste0(data_dir,'\\FVE_2019_polllocation_underlying.csv'))%>%
   select(c(location_category))
-poll_data20<-read.csv(paste0(data_dir,'\\FVE_2020_polllocation_underlying.csv'))%>%
-  select(c(location_category))
+# poll_data20<-read.csv(paste0(data_dir,'\\FVE_2020_polllocation_underlying.csv'))%>%
+#   select(c(location_category))
 ###combine years of poll data
+poll_data17$year<-2017
 poll_data18$year<-2018
 poll_data19$year<-2019
-poll_data20$year<-2020
-poll_data_all<-rbind(poll_data18,poll_data19,poll_data20)
-rm(poll_data18,poll_data19,poll_data20)
+#poll_data20$year<-2020
+poll_data_all<-rbind(poll_data17,poll_data18,poll_data19)
+rm(poll_data17,poll_data18,poll_data19)
 # id cross walk
 crosswalk<-read.csv(paste0(data_dir,'\\L2_StateID_crosswalk_',str_sub(year, start=-2),'.csv'))
 
