@@ -79,14 +79,20 @@ educ_to_ord <- function(data, educ_var, mapping){
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
-L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
-#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
-#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
-year=2019
+year=2018
+
+if(year==2017){
+  L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
+} else if(year==2018){
+  L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
+} else if(year==2019){
+  L2_dir <- L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
+} else {print('poll year error')}
+
 
 # Set variable lists
-## adjust as needed based on variable names in data
-demog_vars18<-c('LALVOTERID', 'Voters_StateVoterID',
+if(year %in% c(2018,2019)){
+demog_vars<-c('LALVOTERID', 'Voters_StateVoterID',
               #address/location
               'Residence_Addresses_AddressLine',
               'Residence_Addresses_Latitude',
@@ -106,33 +112,40 @@ demog_vars18<-c('LALVOTERID', 'Voters_StateVoterID',
               'Voters_CalculatedRegDate',
               'Voters_OfficialRegDate'
 )
-demog_vars17<-c('LALVOTERID', 'Voters_StateVoterID',
-              #address/location
-              'Residence_Addresses_AddressLine',
-              'Residence_Addresses_Latitude',
-              'Residence_Addresses_Longitude',
-              'County','Voters_FIPS','Precinct',
-              #Demographics
-              'Voters_Gender', 'Voters_Age', 'EthnicGroups_EthnicGroup1Desc',
-              'Residence_Families_HHCount', 'Residence_HHGender_Description',
-              'Religions_Description', 
-              ###'MaritalStatus_Description',
-              'CommercialData_Education', 'CommercialData_HHComposition',
-              'CommercialData_EstimatedIncomeAmount',
-              'CommercialData_LikelyUnion',
-              'CommercialData_OccupationIndustry',
-              #Political
-              'Parties_Description',
-              'Voters_CalculatedRegDate',
-              'Voters_OfficialRegDate'
-)
+} else if(year==2017){
+  demog_vars<-c('LALVOTERID', 'Voters_StateVoterID',
+                #address/location
+                'Residence_Addresses_AddressLine',
+                'Residence_Addresses_Latitude',
+                'Residence_Addresses_Longitude',
+                'County','Voters_FIPS','Precinct',
+                #Demographics
+                'Voters_Gender', 'Voters_Age', 'EthnicGroups_EthnicGroup1Desc',
+                'Residence_Families_HHCount', 'Residence_HHGender_Description',
+                'Religions_Description', 
+                ###'MaritalStatus_Description',
+                'CommercialData_Education', 'CommercialData_HHComposition',
+                'CommercialData_EstimatedIncomeAmount',
+                'CommercialData_LikelyUnion',
+                'CommercialData_OccupationIndustry',
+                #Political
+                'Parties_Description',
+                'Voters_CalculatedRegDate',
+                'Voters_OfficialRegDate'
+  )
+} else{print('year error')}
+
 
 
 # Read in data
-#L2demog<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', 
-#                     demog_vars17)
-L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', 
-                     demog_vars18)
+if(year==2019){
+  L2demog<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+} else if (year==2018){
+  L2demog<-get_L2_data(L2_dir, 'VM2--PA--2018-08-22-DEMOGRAPHIC.tab', demog_vars)
+} else if (year==2017){
+  L2demog<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', demog_vars)
+} else {print('poll year error')}
+
 ## race estimates
 ### (2018 has two rows for LALPA182948529)
 #race19<-read.csv(paste0(race_data_dir,'\\pa2019.csv'))
@@ -161,8 +174,10 @@ rm(race)
 
 ####################### Process L2 data to more usable forms
 # Convert income to numeric
-L2demog<-dollar_to_num(L2demog, 'CommercialData_EstimatedHHIncomeAmount')
-#L2demog<-dollar_to_num(L2demog, 'CommercialData_EstimatedIncomeAmount')
+if(year%in%c(2018,2019)){
+  L2demog<-dollar_to_num(L2demog, 'CommercialData_EstimatedHHIncomeAmount')
+} else{L2demog<-dollar_to_num(L2demog, 'CommercialData_EstimatedIncomeAmount')}
+
 # Convert education to ordinal
 ## level to numeric map
 educ_map <- c("Less than HS Diploma - Ex Like"=1,
