@@ -25,9 +25,7 @@ for(i in years){
     mutate(year = i)%>%
     select(all_of(c('CountyName','PrecinctCode','PrecinctName','Description',
                     'address','manual_coded_location_category','year')))
-  manual<-rbind(manual,temp)
-  # assign(paste0('manual',year), 
-  #        read_excel(paste0(data_dir,'/poll_manually_coded_missing_underlying',year,'.xlsx')))
+  manual<-rbind(manual,temp)data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAbElEQVR4Xs2RQQrAMAgEfZgf7W9LAguybljJpR3wEse5JOL3ZObDb4x1loDhHbBOFU6i2Ddnw2KNiXcdAXygJlwE8OFVBHDgKrLgSInN4WMe9iXiqIVsTMjH7z/GhNTEibOxQswcYIWYOR/zAjBJfiXh3jZ6AAAAAElFTkSuQmCC
 }
 manual<-manual%>%
   # Remove extra spaces around commas
@@ -39,6 +37,7 @@ manual<-manual%>%
   # Remove leading zeros from precinct codes
   mutate(PrecinctCode_new=str_remove(PrecinctCode, "^0+"),
          PrecinctCode_new=ifelse(is.na(PrecinctCode_new),PrecinctCode,PrecinctCode_new))%>%
+  ## Prioritize 2018 coding over others (coded by Lee Ann)
   group_by(PrecinctName,Description,address)%>%
   mutate(duplicate = n()>1)%>%
   mutate(manual_coded_location_category = ifelse(duplicate == T, 
@@ -49,7 +48,6 @@ manual<-manual%>%
   distinct()%>%
   rename(location_category=manual_coded_location_category)
 
-  
 
 ## Remove the automatically coded locations since those are already in the data
 # (unnecessary now)
@@ -59,7 +57,9 @@ manual<-manual%>%
 #   rename(location_category = manual_coded_location_category)%>%
 #   mutate(PrecinctCode = as.character(PrecinctCode))
 
+
 # Read in automatically coded location data and merge in manually coded data
+### Overwrite catholic school as just religious school
 ## auto-coded data
 for(i in years){
   assign('poll_struct_key_cath_govsource', read.csv(paste0(data_dir,'/poll_struct_key_cath_govsource_underlying',i,'.csv')))
@@ -84,7 +84,11 @@ for(i in years){
     by = c('PrecinctName','Description','address_stripped'),
     unmatched = 'ignore'
   )%>%
-    select(-c('address_stripped','PrecinctCode_new'))
+    select(-c('address_stripped','PrecinctCode_new'))%>%
+  ### Overwrite catholic school as just religious school
+  mutate(location_category = ifelse(location_category=='catholic school','religious school',
+                                    location_category))
+  
   missing<-poll_struct_key_cath_manual_govsource[is.na(poll_struct_key_cath_manual_govsource$location_category),]
   
   print(nrow(missing))
