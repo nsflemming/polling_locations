@@ -44,19 +44,33 @@ get_poll_data <- function(poll_dir, filename, vars){
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
-### Need to use subsequent year for general election of polling location data year
-#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
-#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
-L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
-
 #set polling location data year
 poll_year=2019
+
+### Need to use subsequent year for general election of polling location data year
+if(poll_year==2017){
+  L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VoterMapping--PA--HEADERS--2017-08-05'
+} else if(poll_year==2018){
+  L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-22'
+} else if(poll_year==2019){
+  L2_dir <- L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
+} else {print('poll year error')}
+
+#
+#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2020_10_01'
 
 # Set variable lists
 demog_vars<-c('LALVOTERID','Voters_StateVoterID','County','Voters_FIPS','Precinct')
 
-# Read in data
-L2loc<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+# Read in Demographic data
+if(poll_year==2019){
+  L2loc<-get_L2_data(L2_dir, 'VM2--PA--2019-08-22-DEMOGRAPHIC.tab', demog_vars)
+} else if (poll_year==2018){
+    L2loc<-get_L2_data(L2_dir, 'VM2--PA--2018-08-22-DEMOGRAPHIC.tab', demog_vars)
+} else if (poll_year==2017){
+  L2loc<-get_L2_data(L2_dir, 'VoterMapping--PA--HEADERS--08-04-2017-HEADERS.tab', demog_vars)
+} else {print('poll year error')}
+
 
 
 ################# merge L2 data with polling location data
@@ -71,16 +85,18 @@ L2loc<-L2loc%>%
 ## merge on state voter id
 merged<-left_join(L2loc, poll, by=c('County','Voters_StateVoterID'='VOTERID'))
 sum(is.na(merged$PrecinctName))
-# missing 695,180 location categories, about 74,000 more than missing from poll 
-# 2020 missing 124,313 poll location data rows, 1.5% missing
-# 2019 missing 139,617 poll location data rows, 1.8% missing
-# 2018 missing 10,163 poll location data rows, 0.1% missing
-# 2017 missing
+# missing  location categories, about  more than missing from poll 
+# 2020 missing  poll location data rows, % missing
+# 2019 missing  poll location data rows, % missing
+# 2018 missing 13,465 poll location data rows, % missing
+# 2017 missing 222,147
 
 ########## write to csv
 setwd(data_dir)
 year_str<-as.character(poll_year)
 write.csv(merged, paste0('L2PA_poll_loc_VM2_',str_sub(year_str,start=-2),'.csv'))
+
+
 
 ######################### Extract voterhistory
 # Set variable lists
@@ -103,7 +119,7 @@ L2votehist19<-get_L2_data(L2_dir,
 ########### write to csv
 setwd(data_dir)
 year_str<-as.character(poll_year)
-write.csv(L2votehist19, paste0('L2PA_votehist_VM2_',str_sub(year_str,start=-2),'.csv'))
+#write.csv(L2votehist19, paste0('L2PA_votehist_VM2_',str_sub(year_str,start=-2),'.csv'))
 
 
 
