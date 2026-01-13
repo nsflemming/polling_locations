@@ -12,7 +12,6 @@ library(readxl)
 data_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data'
 poll_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places'
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
-struct_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/Structures'
 #set year
 years<-c('17','18','19')
 
@@ -25,7 +24,7 @@ for(i in years){
     mutate(year = i)%>%
     select(all_of(c('CountyName','PrecinctCode','PrecinctName','Description',
                     'address','manual_coded_location_category','year')))
-  manual<-rbind(manual,temp)data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAbElEQVR4Xs2RQQrAMAgEfZgf7W9LAguybljJpR3wEse5JOL3ZObDb4x1loDhHbBOFU6i2Ddnw2KNiXcdAXygJlwE8OFVBHDgKrLgSInN4WMe9iXiqIVsTMjH7z/GhNTEibOxQswcYIWYOR/zAjBJfiXh3jZ6AAAAAElFTkSuQmCC
+  manual<-rbind(manual,temp)
 }
 manual<-manual%>%
   # Remove extra spaces around commas
