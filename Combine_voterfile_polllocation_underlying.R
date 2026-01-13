@@ -27,13 +27,13 @@ pad_code<-function(df, code_var,county_var, counties, code_length){
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 FVE_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\FVE_csvs'
 ### set year
-year='2018'
+year='2019'
 
 ### read in processed voterfile
 VF<-read.csv(paste0(FVE_dir,'\\FVE_',year,'.csv'))
 
 ### read in poll location file
-poll<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying',substring(year,3,4),'.csv'))
+poll<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_multcat_govsource_underlying',substring(year,3,4),'.csv'))
 ### Rename McKean to MCKEAN
 poll$CountyName[poll$CountyName=='McKEAN']<-'MCKEAN'
 ### Drop any duplicates that cropped up
@@ -111,7 +111,7 @@ VF_location<-VF_location%>%
   select(c(VOTERID,County,PrecCode,PrecinctName,Description,location_category))
 
 #save to csv
-#write.csv(VF_location,paste0(data_dir,'\\FVE_',year,'_polllocation_underlying.csv'))
+write.csv(VF_location,paste0(data_dir,'\\FVE_',year,'_polllocation_underlying.csv'))
 
 # missing<-VF_location[is.na(VF_location$PrecinctName),]%>%
 #   select(!all_of(c('VOTERID')))%>%
