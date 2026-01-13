@@ -252,14 +252,21 @@ keyword_cols<-c('school','religious','catholic_school','religious_school',
 cols_to_drop<-c('mult_indx',keyword_cols,
                 'pubcen','apt','vet','sencent','assc','milit',
                 'keyword_count', 'location_count','X')
+
 for (i in 1:length(poll_dfs)){
   keyword_match_index<-read.csv(paste0(struct_dir,'/keyword_matrix_underlying',
                                        names(poll_dfs[i]),'.csv'))
   #keyword_match_index$X<-seq(1:nrow(keyword_match_index))
-  struct_and_keyword_index<-left_join(poll_dfs[[i]], keyword_match_index, by='X')%>%
-    rowwise()%>%
+  
+  ### Join keyword index to structure data where structure data is missing
+
+  #### Trim keyword index to just rows where structure data is missing
+  keyword_match_index<-keyword_match_index%>%
+    filter(X%in%poll_dfs[[i]][,'X'][is.na(poll_dfs[[i]]$location_category)])
     ## set indicator for category to 1 if structure data or keyword match a category
     ### Only need x and y for categories present in both structure and keyword data
+  struct_and_keyword_index<-left_join(poll_dfs[[i]], keyword_match_index, by='X')%>%
+    rowwise()%>%
     mutate(school = as.numeric(sum(school.x,school.y, na.rm=T)>0),
            religious = as.numeric(sum(religious.x,religious.y, na.rm=T)>0),
            public_center = as.numeric(sum(pubcen, na.rm=T)>0),
@@ -282,17 +289,13 @@ for (i in 1:length(poll_dfs)){
               'courthouse.x','courthouse.y','library.x','library.y')))%>%
     ungroup()
   #replace NAs in location category columns with 0s
-  struct_and_keyword_index[c('religious',"catholic_school", "government",
-                             'firestation','rangerstation','postoffice',
-                             'policestation','courthouse')][is.na(struct_and_keyword_index[c(
-                 'religious',"catholic_school", "government",'firestation',
-                 'rangerstation','postoffice','policestation','courthouse')])] <- 0
+  struct_and_keyword_index[keyword_cols][is.na(struct_and_keyword_index[keyword_cols])] <- 0
   # Add in keyword codings conditionally
-  ## concatenate if a location has multiple categories
-  ### Replace 1's based on column name
+  ### Replace 1's with the column name
   struct_and_keyword_index <- struct_and_keyword_index %>%
-    mutate(across(keyword_cols,
+    mutate(across(all_of(keyword_cols),
                   ~ ifelse(. == 1, cur_column(), NA)))
+  ### concatenate categories if a location has multiple categories
   struct_and_keyword_index <- struct_and_keyword_index%>%
     rowwise() %>%
     mutate(
@@ -343,8 +346,6 @@ for (i in 1:length(poll_dfs)){
   #Change blank to missing
   mutate(location_category = ifelse(location_category=="",NA,location_category)
   )
-  
-  
   #calc missingness
   #print(paste0('Missingness w/ keywords added in: ',sum(is.na(struct_and_keyword_index$location_category))/nrow(struct_and_keyword_index)))
   #print('Not Saving')
