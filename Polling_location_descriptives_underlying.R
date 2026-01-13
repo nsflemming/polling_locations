@@ -33,7 +33,8 @@ simplify_loc_cat<-function(data, orig_var, simple_var){
 
 ## recode missing location category to other
 recode_NAtoOther<-function(data, loc_cat){
-  data[[loc_cat]][is.na(data[[loc_cat]])]<-'MISSING'
+  data[[loc_cat]][is.na(data[[loc_cat]])]<-'other'
+  data[[loc_cat]][data[[loc_cat]]=='insufficient info']<-'other'
   return(data)
 }
 
@@ -81,7 +82,7 @@ loc_labels_NAsettoOther<-c('Public Location','Public/Justice Location','Other',
                            'Justice Location','Library','Religious School',
                            'Catholic School','Catholic Church','Catholic Location',
                            'Fire Station','Police Station','Religious','Post Office',
-                           'Court House','Government','MISSING')
+                           'Court House','Government','MISSING','Insufficient Info')
 # loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
 #                            'Public Location','Public/Justice Location','Religious Location',
 #                            'Religious School','School')
@@ -98,11 +99,11 @@ loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location'
 
 ############# Plot proportion of polling locations in each category
 ### read in poll location file
-poll_data17<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying17.csv'))%>%
+poll_data17<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_multcat_govsource_underlying17.csv'))%>%
   select(c(location_category))
-poll_data18<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying18.csv'))%>%
+poll_data18<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_multcat_govsource_underlying18.csv'))%>%
   select(c(location_category))
-poll_data19<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying19.csv'))%>%
+poll_data19<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_multcat_govsource_underlying19.csv'))%>%
   select(c(location_category))
 # poll_data20<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying20.csv'))%>%
 #   select(c(location_category))
@@ -112,7 +113,7 @@ poll_data18$year<-2018
 poll_data19$year<-2019
 # poll_data20$year<-2020
 poll_data_all<-rbind(poll_data17,poll_data18,poll_data19)
-## set how 'other category is treated
+## set how 'other' and/or NA category is treated (shouldn't be any NA though, just insufficient info)
 #other_cond='OthersettoNA'
 other_cond='NAsettoOther'
 #loc_labels=loc_labels_OthersettoNA
@@ -120,7 +121,7 @@ loc_labels=loc_labels_NAsettoOther
 
 ## Create simplified location categories variable (subsume catholic into religious)
 #poll_data_all<-simplify_loc_cat(poll_data_all,'location_category')
-## recode missing location category to other or vice versa
+## recode missing/insufficient info location category to other or vice versa
 poll_data_all<-recode_NAtoOther(poll_data_all,'location_category')
 #poll_data<-recode_OthertoNA(poll_data,'location_category')
 
@@ -143,13 +144,10 @@ poll_data_all<-poll_data_all%>%
 
 # Get table of locations with multiple categories
 multiple_categories<-poll_data_all%>%
-  group_by(year,location_category)%>%
-  summarize(num_locs=n())%>%
-  ungroup()%>%
   filter(str_detect(location_category,".*/.*"))
-# write.csv(multiple_categories,
-#           paste0('C:\\Users\\natha\\Desktop\\Polling Places DiD\\plots\\Location Categories\\',
-#                  'Locations_with_Multiple_Categories_Table.csv'))
+write.csv(multiple_categories,
+          paste0('C:\\Users\\natha\\Desktop\\Polling Places DiD\\plots\\Location Categories\\',
+                 'Locations_with_Multiple_Categories_Table.csv'))
 
 
 # plot proportions
@@ -164,7 +162,7 @@ ggplot(poll_data_all, aes(x=fct_reorder(location_category, prop_locs), y=prop_lo
   scale_y_continuous(labels = scales::percent)+
   scale_fill_brewer(palette='Blues')+
   theme(plot.title = element_text(size = 20),
-        axis.text.x = element_text(size=15, angle=30,hjust = 0.9,
+        axis.text.x = element_text(size=15, angle=45,hjust = 0.9,
                                    vjust = 1),
         axis.title.y = element_text(size = 20),
         axis.text.y = element_text(size = 15))
@@ -198,7 +196,7 @@ crosswalk<-read.csv(paste0(data_dir,'\\L2_StateID_crosswalk_',str_sub(year, star
 #other_cond='OthersettoNA'
 #other_cond='NAsettoOther'
 #loc_labels=loc_labels_OthersettoNA
-loc_labels=loc_labels_NAsettoOther
+#loc_labels=loc_labels_NAsettoOther
 ## recode missing location category to other or vice versa
 poll_data_all<-recode_NAtoOther(poll_data_all,'location_category')
 #poll_data<-recode_OthertoNA(poll_data,'location_category')
@@ -222,12 +220,12 @@ ggplot(plot_data, aes(x=fct_reorder(location_category, num_voters), y=num_voters
   geom_col(position = 'dodge')+
   labs(title=paste0('Number of Voters Assigned to \nEach Polling Location Category'),
        x='Location Category',
-       y='Percentage of Voters')+
+       y='Number of Voters')+
   theme_minimal()+
   scale_fill_brewer(palette='Blues')+
   #scale_x_discrete(labels= loc_labels)+
   theme(plot.title = element_text(size = 20),
-        axis.text.x = element_text(size=15, angle=30,hjust = 0.9,
+        axis.text.x = element_text(size=15, angle=45,hjust = 0.9,
                                    vjust = 1),
         axis.title.y = element_text(size = 20),
         axis.text.y = element_text(size = 15))
@@ -249,8 +247,10 @@ ggplot(plot_data, aes(x=fct_reorder(location_category, prop_voters), y=prop_vote
         axis.title.y = element_text(size = 20),
         axis.text.y = element_text(size = 15))
 
+
+############# Currently non-functional ##################
 ##### Plot registered voters at each category of polling location by rural urban divide
-### Read in Data
+### Read in Data 
 # rurality data
 setwd(data_dir)
 rural_data<-read_excel('ruca2010revised.xlsx')
