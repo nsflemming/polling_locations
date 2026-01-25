@@ -71,12 +71,16 @@ rm(hist_poll_2020)
 
 # read in poll location data
 poll_2019<-read_add_year(data_dir, 'L2PA_poll_loc_VM2_19.csv',2019)
+poll_2018<-read_add_year(data_dir, 'L2PA_poll_loc_VM2_18.csv',2018)
 poll_2017<-read_add_year(data_dir, 'L2PA_poll_loc_VM2_17.csv',2017)
+
 # Read in Religious census data
 #setwd(data_dir)
 #relig_census<-read_excel('2020_USRC_Group_Detail.xlsx', sheet = '2020 Group by County')
+
 # Read in distance to polling station data (distance in degrees)
 dist_data17<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2017.csv'))
+dist_data18<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2018.csv'))
 dist_data19<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2019.csv'))
 
 ### read in voter demographic and address data
@@ -84,20 +88,26 @@ dist_data19<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2019.csv'))
 demog_addr_2017<-read.csv(paste0(data_dir,'\\L2PA_2017_address_in_17.csv'))%>%
   select(-c(X, County, Precinct, Voters_FIPS, pub_loc, pub_just,
             other, relig_loc, school, multiple, justice_loc, library, relig_school))
+demog_addr_2018<-read.csv(paste0(data_dir,'\\L2PA_2018_address_in_18.csv'))%>%
+  select(-c(X, County, Precinct, Voters_FIPS, pub_loc, pub_just,
+            other, relig_loc, school, multiple, justice_loc, library, relig_school))
 demog_addr_2019<-read.csv(paste0(data_dir,'\\L2PA_2019_address_in_19.csv'))%>%
   select(-c(X, County, Precinct, Voters_FIPS, pub_loc, pub_just,
             other, relig_loc, school, multiple, justice_loc, library, relig_school))
+
 #### Merge poll location data with voter demographic data on L2 voterid
 demog_addr_2017<-left_join(demog_addr_2017, poll_2017, by='LALVOTERID')
+demog_addr_2018<-left_join(demog_addr_2018, poll_2018, by='LALVOTERID')
 demog_addr_2019<-left_join(demog_addr_2019, poll_2019, by='LALVOTERID')
 # remove data frames to free up memory
-rm(poll_2017, poll_2019)
+rm(poll_2017, poll_2018, poll_2019)
 
 #### Merge distance to poll station data with voter demographic data on L2 voterid
 demog_addr_2017<-left_join(demog_addr_2017, dist_data17, by='LALVOTERID')
+demog_addr_2018<-left_join(demog_addr_2018, dist_data18, by='LALVOTERID')
 demog_addr_2019<-left_join(demog_addr_2019, dist_data19, by='LALVOTERID')
 # remove data frames to free up memory
-rm(dist_data17, dist_data19)
+rm(dist_data17, dist_data18, dist_data19)
 
 #### rbind years together
 ## make column names and number match (check that income variables are equivalent)
@@ -109,10 +119,14 @@ demog_addr_2017<-demog_addr_2017%>%
          )%>%
   # Move columns to 2019 order
   relocate(CommercialData_OccupationGroup, .before = CommercialData_OccupationIndustry)
+
+demog_addr_2018<-demog_addr_2018%>%rename(pred.whi=pred.whi_2018, pred.bla=pred.bla_2018, pred.his=pred.his_2018, 
+                                          pred.asi=pred.asi_2018, pred.oth=pred.oth_2018)
+
 demog_addr_2019<-demog_addr_2019%>%
   rename(pred.whi=pred.whi_2019, pred.bla=pred.bla_2019, pred.his=pred.his_2019, 
          pred.asi=pred.asi_2019, pred.oth=pred.oth_2019)
-poll_demog_addr_all<-rbind(demog_addr_2017, demog_addr_2019)
+poll_demog_addr_all<-rbind(demog_addr_2017, demog_addr_2018, demog_addr_2019)
 ## create race variable for cross-sectional logistic regression
 #poll_demog_addr_all<- replace_na_with_neg_inf(poll_demog_addr_all,c("pred.whi","pred.bla","pred.his",
 #                                      "pred.asi","pred.oth"))
@@ -121,7 +135,7 @@ poll_demog_addr_all<-rbind(demog_addr_2017, demog_addr_2019)
 poll_demog_addr_all<-most_prob_race(poll_demog_addr_all,c("pred.whi","pred.bla","pred.his",
                                            "pred.asi","pred.oth"))
 # remove data frames to free up memory
-rm(demog_addr_2017, demog_addr_2019)
+rm(demog_addr_2017, demog_addr_2018, demog_addr_2019)
 
 #### Merge in voting history on L2 voterid
 vote_poll_demog_addr_all<-left_join(poll_demog_addr_all, hist_2020, by='LALVOTERID')
@@ -213,7 +227,7 @@ vote_poll_demog_addr_all<-select(vote_poll_demog_addr_all, c(LALVOTERID, year,
                                    CommercialData_EstimatedHHIncomeAmount,
                                    Residence_Families_HHCount,has_child,
                                    Religions_Description,known_religious,
-                                   known_catholic,
+                                   #known_catholic,
                                    CommercialData_LikelyUnion,
                                    CommercialData_OccupationIndustry,
                                    CommercialData_OccupationGroup,
