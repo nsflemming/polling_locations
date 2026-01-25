@@ -45,7 +45,7 @@ data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
 #set polling location data year
-poll_year=2019
+poll_year=2018
 
 ### Need to use subsequent year for general election of polling location data year
 if(poll_year==2017){
@@ -103,18 +103,24 @@ write.csv(merged, paste0('L2PA_poll_loc_VM2_',str_sub(year_str,start=-2),'.csv')
 ## adjust as needed based on elections of interest/contained in L2 file
 vote_vars<-c('LALVOTERID',
              #'General_2016_11_08',
-             'General_2017_11_07'
-            #'General_2018_11_06')
+             'General_2017_11_07',
+            'General_2018_11_06'
             ,'General_2019_11_05')
 #vote_vars<-c('LALVOTERID','General_2017_11_07')
 #set polling location data year
-poll_year=2019
+poll_year=2018
 
-L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
+if(poll_year==2018){
+  L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2--PA--2018-08-23'
+  L2votehist19<-get_L2_data(L2_dir, 
+                            'VM2--PA--2018-08-22-VOTEHISTORY.tab', 
+                            vote_vars)
+}
+#L2_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\VM2_PA_2019_08_23'
 
-L2votehist19<-get_L2_data(L2_dir, 
-                          'VM2--PA--2019-08-22-VOTEHISTORY.tab', 
-                          vote_vars)
+# L2votehist19<-get_L2_data(L2_dir, 
+#                           'VM2--PA--2019-08-22-VOTEHISTORY.tab', 
+#                           vote_vars)
 
 ########### write to csv
 setwd(data_dir)
