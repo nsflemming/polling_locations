@@ -219,8 +219,10 @@ blank_pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, m
 ########################################################### Main
 # set directories
 data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
-results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/county_regression_test"
-plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots/county_regression"
+results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/second_submission_logistic_regressions"
+plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots/second_submission_logistic_regressions"
+#results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/county_regression_test"
+#plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots/county_regression"
 # read in data
 setwd(data_dir)
 raw_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
@@ -277,11 +279,12 @@ var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
 
 #################### Logistic Regression
 ##set dependent variable
-#dep_var = 'General_2017_11_07'
-dep_var = 'General_2019_11_05'
+dep_var = 'General_2017_11_07'
+#dep_var = 'General_2018_11_06'
+#dep_var = 'General_2019_11_05'
 year=substr(dep_var,9,12)
 year_num<-as.numeric(year)
-### calculate overall mean turnout for election for plotting
+### Filter to one year and calculate overall mean turnout for election for plotting
 model_data<-model_data[model_data$year==year_num,]
 model_data[[dep_var]][is.na(model_data[[dep_var]])]<-0
 mean_turnout <- mean(model_data[[dep_var]], na.rm=T)
@@ -306,9 +309,11 @@ common_covars <-c(
 ###(subsume catholic into religious)
 model_data<-model_data%>%
   mutate(location_category_simpl = case_when(
-    location_category=='apartment' ~ 'apartment',
+    location_category=='apartment' ~ 'apartment building',
     location_category=='public center' ~ 'community center',
     location_category=='senior center' ~ 'community center',
+    location_category=='public center/senior center' ~ 'community center',
+    location_category=='art center' ~ 'community center',
     location_category=='post office' ~ 'government',
     location_category=='government' ~ 'government',
     location_category=='government/police' ~ 'government/justice',
@@ -321,10 +326,19 @@ model_data<-model_data%>%
 # #Grouping military with veteran association buildings
     location_category=='military' ~ 'military/veteran',
     location_category=='veteran' ~ 'military/veteran',
+    ## Folding in gov/milit too since it's a small category with a large effect
+    location_category=='government/military' ~ 'military/veteran',
     location_category=='association' ~ 'association/club/sport/union',
     location_category=='club' ~ 'association/club/sport/union',
     location_category=='sport' ~ 'association/club/sport/union',
     location_category=='union' ~ 'association/club/sport/union',
+    location_category=='association/union' ~ 'association/club/sport/union',
+    location_category=='sports association' ~ 'association/club/sport/union',
+## Should have been recoded to association earlier...
+    location_category=='event space' ~ 'association/club/sport/union',
+    location_category=='restaurant' ~ 'business',
+    location_category=='nursing home' ~ 'retirement community/nursing home',
+    location_category=='retirement community' ~ 'retirement community/nursing home',
 # #Grouping most smaller categories we haven't theorized about together into 'other'
     # location_category=='military' ~ 'other',
     # location_category=='veteran' ~ 'other',
@@ -332,10 +346,25 @@ model_data<-model_data%>%
     # location_category=='club' ~ 'other',
     # location_category=='sport' ~ 'other',
     # location_category=='union' ~ 'other',
+    location_category=='insufficient info' ~ 'other',
+    location_category=='stadium' ~ 'other',
+    location_category=='museum' ~ 'other',
+    location_category=='hotel' ~ 'other',
+    location_category=='monument' ~ 'other',
+    location_category=='recreation facility' ~ 'other',
+    location_category=='airport' ~ 'other',
+    location_category=='mobile home park' ~ 'other',
+    location_category=='private residence' ~ 'other',
+# Should have been recategorized to other earlier...
+    location_category=='religious/government' ~ 'other',
     .default = location_category
   ))
 
 
+# location category frequencies
+loc_freq<-model_data%>%
+  group_by(location_category_simpl)%>%
+  summarise(n=n())
 
 ## set how 'other category is treated
 #other_cond='OtherSettoNA'
@@ -365,7 +394,7 @@ model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = 
 #religious
 model_data$known_religious<-as.factor(model_data$known_religious)
 #catholic
-model_data$known_catholic<-as.factor(model_data$known_catholic)
+#model_data$known_catholic<-as.factor(model_data$known_catholic)
 #child present
 model_data$has_child<-as.factor(model_data$has_child)
 #government employee
@@ -407,7 +436,7 @@ summary(m_base_mini_test)
 
 #save results
 # set vers
-vers='military_group_v2'
+vers='complete_loc_coding_govmilit_as_milit'
 write_summ(results_dir, paste0('test_base_simpl',year,'_',vers,'_',other_cond), m_base_mini_test)
 
 
@@ -443,7 +472,7 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean
                legend_exist=F,legend_title =NULL, angle=45, hjust_value=1, 
                vjust_value=1,
                legend_position = 'right', output_dir = plot_dir, 
-               image_name = paste0('Test_Pred_Prob_Location_categories_simpl',year,'_',vers,'_',other_cond))
+               image_name = paste0('Pred_Prob_Location_categories_simpl',year,'_',vers,'_',other_cond))
 # create blank plot
 # blank_pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean_turnout,
 #                      ymin=31.5,ymax=37,
@@ -475,7 +504,8 @@ schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='margi
 #plot predicted probabilities
 pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = mean_turnout,
                plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations'),
-               xlab='Has a Child/Children', x_axis_labels = c('FALSE', 'TRUE'),
+               xlab='Has a Child/Children', 
+               #x_axis_labels = c('FALSE', 'TRUE'),
                legend_exist=T, legend_title ='Votes at a School', angle=0,legend_position = 'right',
                output_dir = plot_dir, 
                image_name = paste0('Pred_Prob_child_school_',year,'_',vers,'_',other_cond))
@@ -488,3 +518,6 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = me
 #                      legend_position = 'right', output_dir = plot_dir, 
 #                      image_name = paste0('Pred_Prob_child_school_',year,'_',vers,'_blank_',other_cond))
 
+
+###### random code for troubleshooting
+geocoded<-read.csv('C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places geocoded/geocoderesult_2017_poll_locations_10000.csv')
