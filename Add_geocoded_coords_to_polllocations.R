@@ -21,8 +21,9 @@ pad_code<-function(df, code_var,county_var, counties, code_length){
 ################## Main
 ### set directories
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
+diagnostic_dir<-'C:/Users/natha/Desktop/Polling Places DiD/Non-plot descriptive info'
 ### set year
-year='2017'
+year='2018'
 
 ### read in geocoded file
 geo<-read.csv(paste0(data_dir,'\\gov_poll_places geocoded\\geocoderesult_',year,'_poll_locations_10000.csv'), 
@@ -30,7 +31,8 @@ geo<-read.csv(paste0(data_dir,'\\gov_poll_places geocoded\\geocoderesult_',year,
 
 ### read in poll location file
 #poll<-read.csv(paste0(data_dir,'\\poll_struct_key_govsource',substring(year,3,4),'.csv'))
-poll<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_govsource_underlying',substring(year,3,4),'.csv'))
+poll<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying',substring(year,3,4),'.csv'))
+#haven't re-run with manually coded locations as of 1/24/26
 
 ### remove commas from addresses (2019 addresses have weird zipcodes too)
 geo$address<-str_remove_all(geo$V2, pattern = "\\,")
@@ -48,6 +50,14 @@ poll_longlat<-left_join(poll, address_longlat, by='address')%>%
   select(c(CountyName, PrecinctCode, PrecinctName, Description, address,
            location_category, V6))%>%
   rename(long_lat = V6)
+
+# Check poll location coordinate missingness by location category
+poll_longlat_miss_summ<-poll_longlat%>%
+  group_by(location_category)%>%
+  summarize(long_lat_miss=sum(is.na(long_lat)),
+            num_loc = n())
+#save
+write.csv(poll_longlat_miss_summ, paste0(diagnostic_dir,'\\pollocation_miss_longlat',year,'.csv'))
 
 #split longitude and latitude into separate columns
 poll_longlat<-poll_longlat%>%
@@ -102,6 +112,14 @@ poll_longlat$PrecinctCode[poll_longlat$CountyName=='BUTLER']<-
 ### Rename McKean to MCKEAN
 poll_longlat$CountyName[poll_longlat$CountyName=='McKEAN']<-'MCKEAN'
 
+# Check voter coordinate missingness by county
+VF_longlat_miss_summ<-VF%>%
+  group_by(County)%>%
+  summarize(long_lat_miss=sum(is.na(Residence_Addresses_Latitude)))
+#save
+write.csv(VF, paste0(diagnostic_dir,'\\voter_location_miss_longlat',year,'.csv'))
+
+
 ### Merge voterid locations and poll locations
 voter_poll_longlats<-left_join(VF,poll_longlat, by=c('County'='CountyName',
                                                      'PrecCode'='PrecinctCode'))
@@ -115,7 +133,14 @@ voter_poll_longlats$poll_longitude<-as.character(voter_poll_longlats$poll_longit
 voter_poll_longlats$poll_latitude<-as.character(voter_poll_longlats$poll_latitude)
 voter_poll_longlats<-voter_poll_longlats%>%
   filter(complete.cases(.))
+
+## Drop all variables except voter id, poll location identifier, and respsective coordinates
+voter_poll_longlats<-voter_poll_longlats%>%
+  select(all_of(c('LALVOTERID','Residence_Addresses_Latitude','Residence_Addresses_Longitude',
+                  'poll_longitude','poll_latitude')))
+
+
 #save
-write.csv(voter_poll_longlats, paste0(data_dir,'\\voterloc_pollocation',year,'_geocoded','.csv'))
+#write.csv(voter_poll_longlats, paste0(data_dir,'\\voterloc_pollocation',year,'_geocoded','.csv'))
 
 
