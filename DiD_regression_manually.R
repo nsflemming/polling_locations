@@ -242,14 +242,14 @@ model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = 
 #religious
 model_data$known_religious<-as.factor(model_data$known_religious)
 #catholic
-model_data$known_catholic<-as.factor(model_data$known_catholic)
+#model_data$known_catholic<-as.factor(model_data$known_catholic)
 #child present
 model_data$has_child<-as.factor(model_data$has_child)
 #union member
 model_data$CommercialData_LikelyUnion<-as.factor(model_data$CommercialData_LikelyUnion)
 #occupational group (Not a variable in 2017 data, so have to remove if using that year)
-model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
-model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
+#model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
+#model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
 #occupational Industry (substitute for occupation group)
 model_data$CommercialData_OccupationIndustry<-as.factor(model_data$CommercialData_OccupationIndustry)
 model_data$CommercialData_OccupationIndustry<-relevel(model_data$CommercialData_OccupationIndustry, ref='Unknown')
@@ -259,8 +259,8 @@ model_data$CommercialData_OccupationIndustry<-relevel(model_data$CommercialData_
 two_data<-model_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
-  mutate(#ever_changed_poll_loc=(sum(changed_poll_loc)>0),
-         #ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
+  mutate(ever_changed_poll_loc=(sum(changed_poll_loc)>0),
+         ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
          ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0)
          #ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0)
          )%>% 
@@ -328,25 +328,25 @@ mini<-no_chng_or_no_mv_two_data%>%
          CommercialData_OccupationIndustry=as.integer(CommercialData_OccupationIndustry)
   )
 
-# full<-no_chng_or_no_mv_two_data%>%
-#   mutate(treat=as.integer(ever_no_move_new_poll_loc),
-#          Voters_Gender=case_when(
-#            Voters_Gender=='M' ~ 0,
-#            Voters_Gender=='F'~1,
-#            .default = NA
-#          ),
-#          Voters_Age=as.integer(Voters_Age),
-#          Parties_Description=as.integer(Parties_Description),
-#          pred_race=as.integer(pred_race),
-#          known_religious=as.integer(known_religious),
-#          CommercialData_LikelyUnion=as.integer(CommercialData_LikelyUnion)
-#          #CommercialData_OccupationGroup=as.integer(CommercialData_OccupationGroup)
-#   )
+full<-no_chng_or_no_mv_two_data%>%
+  mutate(treat=as.integer(ever_no_move_new_poll_loc),
+         Voters_Gender=case_when(
+           Voters_Gender=='M' ~ 0,
+           Voters_Gender=='F'~1,
+           .default = NA
+         ),
+         Voters_Age=as.integer(Voters_Age),
+         Parties_Description=as.integer(Parties_Description),
+         pred_race=as.integer(pred_race),
+         known_religious=as.integer(known_religious),
+         CommercialData_LikelyUnion=as.integer(CommercialData_LikelyUnion)
+         #CommercialData_OccupationGroup=as.integer(CommercialData_OccupationGroup)
+  )
 
 
 # fix covariates at 2017 values
 ## Filter data for year 2017
-mini_2017 <- mini %>%
+full_2017 <- full %>%
   filter(year == 2017) %>%
   select(all_of(c('LALVOTERID','County','Voters_Gender', 'Voters_Age', 'Parties_Description', 
                   'pred_race','CommercialData_EstimatedHHIncomeAmount', 
@@ -356,8 +356,8 @@ mini_2017 <- mini %>%
                   'CommercialData_OccupationIndustry',
                   'years_reg')))
 ## Join back to the original dataset
-mini <- mini %>%
-  left_join(mini_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
+full <- full %>%
+  left_join(full_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
   mutate(
     Voters_Gender = Voters_Gender_2017,
     Voters_Age = Voters_Age_2017,
@@ -444,42 +444,59 @@ ps_formula <- treat ~ County +Voters_Gender + Voters_Age + Parties_Description+
 # Matching using MatchIt package
 ## Default logistic regression calculated propensity score matching
 ### no replacement, one control to one treated
-m.logit<-matchit(ps_formula,data=mini, replace=F)
+m.logit<-matchit(ps_formula,data=full, replace=F)
 summary(m.logit)
 # Check balance
 love.plot(m.logit, drop.distance = TRUE)
 ## Mahalanobis Metric Matching
 ### matches observation to nearest, not exact match
-m.mahal<-matchit(ps_formula,data=mini, replace=F,distance="mahalanobis")
-summary(m.mahal)
+# m.mahal<-matchit(ps_formula,data=mini, replace=F,distance="mahalanobis")
+# summary(m.mahal)
 # Check balance
-love.plot(m.mahal, drop.distance = TRUE)
+# love.plot(m.mahal, drop.distance = TRUE)
 ## Convert match object into a dataset
-mahal.match<-match.data(m.mahal)
+logit.match<-match.data(m.logit)
+# mahal.match<-match.data(m.mahal)
 ## t-test comparing outcome
-t.test(voted ~ treat, data = mahal.match)
+t.test(voted ~ treat, data = logit.match)
+## save t-test output
+new_loc.t<-t.test(voted ~ treat, data = logit.match)
+chars <- capture.output(print(new_loc.t))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "new_location_t_test_2_12_26.txt"))
+)
 
 
-
-
-#Linear model with covariates (covariates not necessarily needed if balance is good enough)
-fit1 <- glm(voted ~ treat * (County+Voters_Gender+Voters_Age+Parties_Description+pred_race+
-                               CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
-                               known_religious+CommercialData_LikelyUnion+years_reg),
-              data = mahal.match,
+#Linear model without covariates (covariates not necessarily needed if balance is good enough)
+fit1 <- glm(voted ~ treat,
+              data = logit.match,
               family = binomial(link = 'logit'),
             weights = weights)
+summary(fit1)
+chars <- capture.output(print(summary(fit1)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "new_location_glm_no_covars_2_12_26.txt"))
+)
 #estimate ATT
-avg_comparisons(fit1,
+fit1.ATT<-avg_comparisons(fit1,
+                # Variables to estimate the effect for
                 variables = "treat",
-                # I think this variable determines the clustering of the errors?:
+                # I think variables also determines the clustering of the errors?:
                 ## "this formula is passed to the cluster argument of the sandwich::vcovCL function"
-                ## Clustering on matches created by prop score matching
+                ## Clustering on matches created by prop score matching?
                 vcov = ~subclass,
+                # selects the subset of the dataset used to fit the model
                 newdata = subset(treat == 1),
                 # Calculate relative risk
                 comparison = "lnratioavg",
                 transform = "exp")
+fit1.ATT
+chars <- capture.output(print(fit1.ATT))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "new_location_glm_no_covars_ATT_2_12_26.txt"))
+)
+
+
 ## PSM nearest neighbor
 ##m.nn<-matchit(lalonde.formu, data = lalonde, caliper=0.1, method ="nearest")
 m.nn<-matchit(ps_formula, data = mini, ratio = 1, method ="nearest")

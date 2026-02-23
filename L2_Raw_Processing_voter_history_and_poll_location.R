@@ -45,7 +45,7 @@ data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
 race_data_dir<-'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data\\predicted_race_data'
 ## adjust as needed based on year desired
 #set polling location data year
-poll_year=2018
+poll_year=2019
 
 ### Need to use subsequent year for general election of polling location data year
 if(poll_year==2017){
@@ -76,7 +76,7 @@ if(poll_year==2019){
 ################# merge L2 data with polling location data
 # Read in location/category data
 poll <- get_poll_data(data_dir, paste0('FVE_',poll_year,'_polllocation_underlying.csv'), 
-                      c('VOTERID','County', 'PrecinctName', 'location_category',
+                      c('VOTERID','County', 'PrecinctName', 'location_category','address',
                         'Description'))
 ### Replace '-' in L2 precinct names to better match government format
 L2loc<-L2loc%>%

@@ -134,7 +134,7 @@ voter_poll_longlats$poll_latitude<-as.character(voter_poll_longlats$poll_latitud
 voter_poll_longlats<-voter_poll_longlats%>%
   filter(complete.cases(.))
 
-## Drop all variables except voter id, poll location identifier, and respsective coordinates
+## Drop all variables except voter id, poll location identifier, and respective coordinates
 voter_poll_longlats<-voter_poll_longlats%>%
   select(all_of(c('LALVOTERID','Residence_Addresses_Latitude','Residence_Addresses_Longitude',
                   'poll_longitude','poll_latitude')))

@@ -259,15 +259,4 @@ ggplot(data=county_change)+
         axis.text.x = element_text(angle=90, hjust=1, vjust=0.5),
         axis.text.y = element_text(size = 15))
 
-ca_map <- ggplot(data=washington, mapping=aes(x=long, y=lat, group=group)) + 
-  coord_fixed(1.3) + 
-  geom_polygon(color="black", fill="gray") + 
-  geom_polygon(data=washington_county, fill=NA, color="white") + 
-  geom_polygon(color="black", fill=NA) + 
-  ggtitle('Washington Map with Counties') + 
-  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(),
-        axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank())
-ca_map
-
-
 

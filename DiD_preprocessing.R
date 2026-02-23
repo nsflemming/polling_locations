@@ -79,9 +79,9 @@ poll_2017<-read_add_year(data_dir, 'L2PA_poll_loc_VM2_17.csv',2017)
 #relig_census<-read_excel('2020_USRC_Group_Detail.xlsx', sheet = '2020 Group by County')
 
 # Read in distance to polling station data (distance in degrees)
-dist_data17<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2017.csv'))
-dist_data18<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2018.csv'))
-dist_data19<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2019.csv'))
+dist_data17<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2017v2.csv'))
+dist_data18<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2018v2.csv'))
+dist_data19<-read.csv(paste0(data_dir,'\\voterloc_pollloc_dist_2019v2.csv'))
 
 ### read in voter demographic and address data
 ## remove county and precinct columns since that's in the voter history/polling location files
@@ -186,7 +186,10 @@ vote_poll_demog_addr_all<-vote_poll_demog_addr_all%>%
     ## set to TRUE when address doesn't match previous
     changed_address = (Residence_Addresses_AddressLine != lag(Residence_Addresses_AddressLine)),
     ## set to TRUE when polling location address doesn't match previous
-    changed_poll_loc = (Description != lag(Description))
+    ### Currently comparing polling location descriptions
+    #changed_poll_loc = (Description != lag(Description))
+    ### Currently comparing polling location addresses
+    changed_poll_loc = (address != lag(address))
     )%>%
     ## Once treated, all subsequent values = treated
     ### need extra step to avoid NAs in 2017?

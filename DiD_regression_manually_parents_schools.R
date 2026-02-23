@@ -118,15 +118,15 @@ model_data$Parties_Description <- as.factor(model_data$Parties_Description)
 model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
 #religious
 model_data$known_religious<-as.factor(model_data$known_religious)
-#catholic
-model_data$known_catholic<-as.factor(model_data$known_catholic)
+#catholic (not relevant any more)
+#model_data$known_catholic<-as.factor(model_data$known_catholic)
 #child present
 model_data$has_child<-as.factor(model_data$has_child)
 #union member
 model_data$CommercialData_LikelyUnion<-as.factor(model_data$CommercialData_LikelyUnion)
 #occupational group (Not a variable in 2017 data, so have to remove if using that year)
-model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
-model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
+#model_data$CommercialData_OccupationGroup<-as.factor(model_data$CommercialData_OccupationGroup)
+#model_data$CommercialData_OccupationGroup<-relevel(model_data$CommercialData_OccupationGroup, ref='Blue Collar')
 #occupational Industry (substitute for occupation group)
 model_data$CommercialData_OccupationIndustry<-as.factor(model_data$CommercialData_OccupationIndustry)
 model_data$CommercialData_OccupationIndustry<-relevel(model_data$CommercialData_OccupationIndustry, ref='Unknown')
@@ -186,13 +186,14 @@ no_chng_or_no_mv_two_data<-no_chng_or_no_mv_two_data%>%
 
 # Logistic Regression based scores
 ## Change in polling location without moving
+## Change in polling location (to a school) without moving
 ps_formula <- parent_new_poll_school ~  Voters_Gender + Voters_Age + Parties_Description+
   pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
   known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
   years_reg
 
 ################## Test on parents/schools
-### Parents who changed polling station
+### Parents who changed polling station to a school vs. not a school
 voters_parents_two_data<-two_data%>%
   # only people who have changed polling location
   filter(ever_changed_poll_loc==T)%>%
@@ -208,11 +209,7 @@ voters_parents_two_data<-two_data%>%
 
 voters_parents_two_data['parent_new_poll_school'] <- sapply(voters_parents_two_data['parent_new_poll_school'],as.numeric)
 voters_parents_two_data$voted<-as.numeric(voters_parents_two_data$voted)
-### Subsample for testing
-# mini_parent<-voters_parents_two_data%>%
-#   group_by(parent_new_poll_school)%>%
-#   slice_sample(n=1000000)%>%
-#   ungroup()
+
 
 # fix covariates at 2017 values
 ## Filter data for year 2017
@@ -253,11 +250,77 @@ love.plot(m.logit, drop.distance = TRUE)
 logit.match<-match.data(m.logit)
 ## t-test comparing outcome
 t.test(voted ~ parent_new_poll_school, data = logit.match)
+### significant difference between groups means treatment has effect (Right?)
+## save t-test output
+parent.t<-t.test(voted ~ parent_new_poll_school, data = logit.match)
+chars <- capture.output(print(parent.t))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "parent_school_t_test_2_11_26.txt"))
+)
 
 
 #binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
-parent.fit1 <- glm(voted ~ treat,
+parent.fit1 <- glm(voted ~ parent_new_poll_school,
                    data = logit.match,
                    family = binomial(link = 'logit'),
                    weights = weights)
 
+summary(parent.fit1)
+chars <- capture.output(print(summary(parent.fit1)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "parent_school_glm_no_covars_2_12_26.txt"))
+)
+#estimate ATT
+parent.fit1.ATT<-avg_comparisons(parent.fit1,
+                                 # Variable(s) to estimate the effect for
+                variables = "parent_new_poll_school",
+                # Clustering on matches created by prop score matching?
+                ## ~variable indicates the name of the cluster variable 
+                ### requests cluster-robust SEs
+                #https://cran.r-project.org/web/packages/MatchIt/vignettes/estimating-effects.html#estimating-treatment-effects-and-standard-errors-after-matching
+                vcov = ~subclass,
+                # selects the subset of the dataset used to fit the model
+                ## treatment==1 means matched dataset with only the treated units
+                newdata = subset(parent_new_poll_school == 1),
+                # Calculate relative risk
+                comparison = "lnratioavg",
+                transform = "exp")
+parent.fit1.ATT
+chars <- capture.output(print(parent.fit1.ATT))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "parent_school_glm_no_covars_ATT_2_12_26.txt"))
+)
+
+
+#binomial model w/ covariates
+parent.fit2 <- glm(voted ~ parent_new_poll_school+Voters_Gender + Voters_Age + Parties_Description+
+                     pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                     known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                     years_reg,
+                   data = logit.match,
+                   family = binomial(link = 'logit'),
+                   weights = weights)
+
+summary(parent.fit2)
+chars <- capture.output(print(summary(parent.fit2)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "parent_school_glm_covars_2_12_26.txt"))
+)
+#estimate ATT
+parent.fit2.ATT<-avg_comparisons(parent.fit2,
+                                 # Variables to estimate the effect for
+                                 variables = "parent_new_poll_school",
+                                 # I think variables also determines the clustering of the errors?:
+                                 ## "this formula is passed to the cluster argument of the sandwich::vcovCL function"
+                                 ## Clustering on matches created by prop score matching?
+                                 vcov = ~subclass,
+                                 # selects the subset of the dataset used to fit the model
+                                 newdata = subset(parent_new_poll_school == 1),
+                                 # Calculate relative risk
+                                 comparison = "lnratioavg",
+                                 transform = "exp")
+parent.fit2.ATT
+chars <- capture.output(print(parent.fit2.ATT))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "parent_school_glm_covars_ATT_2_12_26.txt"))
+)

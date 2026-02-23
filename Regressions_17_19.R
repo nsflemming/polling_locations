@@ -164,7 +164,7 @@ pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, mean_vo
                   width=0.2, linewidth=1, position=position_dodge(dodge), 
                   show.legend = legend_exist)+
     # draw line at mean voting rate
-    #geom_hline(aes(yintercept = mean_vote, linetype=''), color='black')+
+    geom_hline(aes(yintercept = mean_vote, linetype=''), color='black')+
     #scale_linetype_manual(name = "Mean Voting Rate", values=1, guide = guide_legend(override.aes = list(color = c("black"))))+
     labs(title = plot_title,
          x = xlab,
@@ -279,9 +279,9 @@ var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
 
 #################### Logistic Regression
 ##set dependent variable
-dep_var = 'General_2017_11_07'
+#dep_var = 'General_2017_11_07'
 #dep_var = 'General_2018_11_06'
-#dep_var = 'General_2019_11_05'
+dep_var = 'General_2019_11_05'
 year=substr(dep_var,9,12)
 year_num<-as.numeric(year)
 ### Filter to one year and calculate overall mean turnout for election for plotting
@@ -520,4 +520,4 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = me
 
 
 ###### random code for troubleshooting
-geocoded<-read.csv('C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places geocoded/geocoderesult_2017_poll_locations_10000.csv')
+#geocoded<-read.csv('C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places geocoded/geocoderesult_2017_poll_locations_10000.csv')

@@ -14,8 +14,8 @@ library(Dict) # dictionaries
 data_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data'
 poll_dir <- 'C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places'
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
-#set year
-years<-c('17','18','19')
+#set year(s)
+years<-c('19')
 
 for(year in years){
 poll_data<-read.csv(paste0(data_dir,'/poll_struct_key_cath_manual_govsource_underlying',year,'.csv'))
@@ -182,109 +182,3 @@ poll_data<-poll_data%>%
 # Save
 write.csv(poll_data,paste0(data_dir,'/poll_struct_key_cath_manual_multcat_govsource_underlying',year,'.csv'))
 }
-
-# multiple_categories<-multiple_categories%>%
-#   # approximately in order of frequency and dominant category
-#   mutate(location_category = case_when(
-#     location_category == 'government/police' ~ "government/justice",
-#     location_category == 'school/religious' ~ "religious school",
-#     location_category == 'school/religious/union' ~ "religious school",
-#     location_category == 'school/religious/sport' ~ "religious school",
-#     location_category == 'school/sport' ~ "school",
-#     location_category == 'school/sport/union' ~ "school",
-#     location_category == 'sport/school' ~ "school",
-#     location_category == 'school/union' ~ "school",
-#     location_category == 'school/library' ~ "school",
-#     location_category == 'school/government' ~ "school",
-#     location_category == 'school/community center' ~ "school",
-#     location_category == 'school/public_center' ~ "school",
-#     location_category == 'school/votech' ~ "school",
-#     location_category == 'art center/school' ~ "school",
-#     location_category == 'religious/senior_center' ~ "senior center",
-#     location_category == 'public_center/government' ~ "public center",
-#     location_category == 'public_center/sport' ~ "public center",
-#     location_category == 'public_center/union' ~ "public center",
-#     location_category == 'religious/public_center' ~ "public center",
-#     location_category == 'government/sport' ~ "government",
-#     location_category == 'government/sport/other' ~ "government",
-#     location_category == 'government/park' ~ "government",
-#     location_category == 'government/union' ~ "government",
-#     location_category == 'government/association' ~ "government",
-#     location_category == 'senior center/government' ~ "government",
-#     location_category == 'religious/union' ~ "religious",
-#     location_category == 'religious/sport' ~ "religious",
-#     location_category == 'religious/association' ~ "religious",
-#     location_category == 'religious/courthouse' ~ "religious",
-#     location_category == 'religious/library' ~ "religious",
-#     location_category == 'religious/sport/union' ~ "religious",
-#     location_category == 'religious/government/union' ~ "religious",
-#     location_category == 'apartment/public housing' ~ "public/subsidized housing",
-#     location_category == 'apartment/subsidized housing' ~ "public/subsidized housing",
-#     location_category == 'apartment/union' ~ "apartment",
-#     location_category == 'religious/apartment' ~ "apartment",
-#     location_category == 'public_center/apartment' ~ "apartment",
-#     location_category == 'apartment/public center' ~ "apartment",
-#     location_category == 'apartment/association' ~ "apartment",
-#     location_category == 'club/apartment' ~ "apartment",
-#     location_category == 'school/apartment' ~ "apartment",
-#     location_category == 'school/apartment/union' ~ "apartment",
-#     location_category == 'firestation/union' ~ "fire station",
-#     location_category == 'firestation/government/union' ~ "fire station",
-#     location_category == 'firestation/library' ~ "fire station",
-#     location_category == 'school/firestation' ~ "fire station",
-#     location_category == 'club/sport' ~ "club",
-#     location_category == 'club/association' ~ "club",
-#     location_category == 'club/union' ~ "club",
-#     location_category == 'government/club' ~ "club",
-#     location_category == 'private residence/insufficient info' ~ "insufficient info",
-#     location_category == 'insufficient info/private residence' ~ "insufficient info",
-#     location_category == 'park/insufficient info' ~ "insufficient info",
-#     location_category == 'park/community center' ~ "community center",
-#     location_category == 'association/community center' ~ "community center",
-#     location_category == 'community center/association' ~ "community center",
-#     location_category == 'art center/business' ~ 'art center',
-#     location_category == 'park/public center' ~ "park",
-#     location_category == 'religious/business' ~ "business",
-#     location_category == 'courthouse/sport' ~ "courthouse",
-#     location_category == 'courthouse/union' ~ "courthouse",
-#     location_category == 'association/sport' ~ "association",
-#     location_category == 'firestation/association' ~ "association",
-#     location_category == 'association/event space' ~ 'association',
-#     location_category == 'government/library' ~ "library",
-#     location_category == 'library/union' ~ "library",
-#     location_category == 'public_center/veteran' ~ "veteran",
-#     location_category == 'sport/union' ~ 'sport',
-# 
-#     # Retained multiple categories and tough cases
-#     location_category == 'firestation/government' ~ "government/firestation",
-#     #location_category == 'association/union' ~ "association/union", #tough case
-#     #location_category == 'religious/government' ~ "religious/government", #tough case
-#     #location_category == 'religious/firestation' ~ "religious/firestation", #tough case
-#     #location_category == 'religious/public center' ~ "other", #non-profit
-#     location_category == 'retirement community/nursing home' ~ "retirement community/nursing home",
-#     location_category == 'public_center/senior_center' ~ "public_center/senior_center",
-# 
-#     # Overwiting Others
-#     location_category == 'school/other' ~ "school",
-#     location_category == 'school/senior_center/other' ~ "school",
-#     location_category == 'senior_center/other' ~ "senior center",
-#     location_category == 'government/senior_center/other' ~ "senior center",
-#     location_category == 'public_center/senior_center/other' ~ "senior center",
-#     location_category == 'public_center/other' ~ 'public_center',
-#     location_category == 'religious/other' ~ "religious",
-#     location_category == 'apartment/other' ~ "apartment",
-#     location_category == 'club/other' ~ "club",
-#     location_category == 'association/other' ~ "association",
-#     location_category == 'sport/other' ~ "sport",
-#     location_category == 'union/other' ~ "union",
-#     #
-#     .default = location_category
-#   ))
-# 
-# # Isolate multiples to view
-# multiple_categories<-multiple_categories%>%
-#   group_by(location_category)%>%
-#   filter(str_detect(location_category,".*/.*"))%>%
-#   distinct()
-
-

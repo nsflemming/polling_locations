@@ -130,8 +130,6 @@ union_wrds<-c('UNION', 'TEAMSTERS','UAW','U.E.','LOCAL')
 othr_wrds<-c('SENIOR', 'YOUTH','CHILD','OLDER ADULT','EARLY CHILDHOOD',
              'AGING','FOOD BANK')
 
-## Combine all word vectors for categories that will be subsumed into other
-#othr_wrds<-
 
 ##################################################
 #set directories

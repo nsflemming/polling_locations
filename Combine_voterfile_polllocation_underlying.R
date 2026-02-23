@@ -41,6 +41,9 @@ poll<-poll%>%
   select(-X)%>%
   distinct()
 
+### read in manually corrected unmatched 2017 addresses
+corrected_addresses<-read.csv(paste0(data_dir,'\\Polling Place List 2017 Unmatched Addresses Corrected.csv'))
+
 ### merge files on county name and precinct code
 ## modify VF codes to match patterns of polling location codes
    ########## Need to modify 2017 codes too #######
@@ -108,7 +111,22 @@ sum(is.na(VF_location$PrecinctName))
 
 # drop unneeded columns
 VF_location<-VF_location%>%
-  select(c(VOTERID,County,PrecCode,PrecinctName,Description,location_category))
+  select(c(VOTERID,County,PrecCode,PrecinctName,address,Description,location_category))
+
+##### Match and replace addresses with corrected addresses ####
+## Get just the old and new addresses from the corrected data set and rename them for matching
+##    Also remove duplicates to prevent error in rows_update()
+corrected_addresses<-corrected_addresses%>%
+  select(all_of(c('address.old','address.clean')))%>%
+  rename(address.id = address.old,
+         address = address.clean)%>%
+  distinct()
+## Create an id address variable to match on
+VF_location<-mutate(VF_location, address.id= address)
+## Update
+VF_location<-rows_update(VF_location, corrected_addresses, by = "address.id",
+                  unmatched = "ignore")%>%
+  select(-address.id)
 
 #save to csv
 write.csv(VF_location,paste0(data_dir,'\\FVE_',year,'_polllocation_underlying.csv'))
