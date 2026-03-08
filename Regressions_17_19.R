@@ -14,6 +14,7 @@ library(gridExtra) # plot multiple graphs together
 library(margins) # get average marginal effects
 library(ggeffects) #plot predicted probabilities
 library(dplyr)
+library(clubSandwich) # Cluster robust standard errors (clustered standard errors)
 
 ########## Functions
 
@@ -437,7 +438,7 @@ summary(m_base_mini_test)
 #save results
 # set vers
 vers='complete_loc_coding_govmilit_as_milit'
-write_summ(results_dir, paste0('test_base_simpl',year,'_',vers,'_',other_cond), m_base_mini_test)
+#write_summ(results_dir, paste0('test_base_simpl',year,'_',vers,'_',other_cond), m_base_mini_test)
 
 
 ##### Probability of Voting, Location category as predictor for individual counties
@@ -497,6 +498,12 @@ ind_vars_child_schl <-c(
 # model
 m_schl<-log_reg(model_data, dep_var, ind_vars_child_schl)
 summary(m_schl)
+# Clustered standard errors (clustered at county level)
+### Can't cluster errors with this model specification b/c of the size of the covariance matrix being too large to store in memory
+#### Too many observations and/or clusters I believe
+# robust_se_cluster<-coef_test(m_schl, vcov = 'CR2', cluster = model_data$County,
+#                              coefs=c('has_childTRUE','schoolTRUE','has_childTRUE:schoolTRUE'))
+
 #save results
 write_summ(results_dir, paste0('school_',year,'_',vers,'_',other_cond), m_schl)
 ## Calculate and plot predicted probabilities
@@ -517,6 +524,40 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = me
 #                      legend_exist=T,legend_title ='Votes at a School', angle=0, 
 #                      legend_position = 'right', output_dir = plot_dir, 
 #                      image_name = paste0('Pred_Prob_child_school_',year,'_',vers,'_blank_',other_cond))
+
+
+##### Probability of Voting, If has/lacks child and is voting at a school and it's a new polling location for them
+## create school dummy
+model_data$school <- model_data$location_category=='school' 
+model_data$school <- as.factor(model_data$school)
+#filter to just people who got assigned a new poll location
+model_data_new_loc<-model_data%>%
+  filter(no_move_new_poll_loc==1)
+## interaction
+ind_vars_child_schl <-c(
+  # var of interest
+  'has_child*school',
+  common_covars
+)
+# model
+m_schl_new<-log_reg(model_data_new_loc, dep_var, ind_vars_child_schl)
+summary(m_schl_new)
+#save results
+write_summ(results_dir, paste0('school_new_loc',year,'_',vers,'_',other_cond), m_schl_new)
+## Calculate and plot predicted probabilities
+schl_pred_new<-predict_response(m_schl_new, terms=c('has_child','school'), margin='marginalmeans')
+#plot predicted probabilities
+pred_prob_plot(model_data=model_data_new_loc, dep_var=dep_var, schl_pred_new, mean_vote = mean_turnout,
+               plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations\nafter Being Assigned a New Poll Location'),
+               xlab='Has a Child/Children', 
+               #x_axis_labels = c('FALSE', 'TRUE'),
+               legend_exist=T, legend_title ='Votes at a School', angle=0,legend_position = 'right',
+               output_dir = plot_dir, 
+               image_name = paste0('Pred_Prob_child_school_new_loc_',year,'_',vers,'_',other_cond))
+# create blank plot
+
+
+
 
 
 ###### random code for troubleshooting
