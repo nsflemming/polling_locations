@@ -148,9 +148,8 @@ blank_plot_did<-function(data, did_model, dvar, plot_title, group1='Control', gr
 data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
 results_dir <-"C:/Users/natha/Desktop/Polling Places DiD/model_results"
 plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
-# read in two-time period data
+# read in multi-time period data
 setwd(data_dir)
-#two_data<-read.csv('DiD_prepped_poll_vote_18to19.csv')
 model_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
 
 
@@ -259,11 +258,11 @@ model_data$CommercialData_OccupationIndustry<-relevel(model_data$CommercialData_
 two_data<-model_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
-  mutate(ever_changed_poll_loc=(sum(changed_poll_loc)>0),
-         ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
-         ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0)
-         #ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0)
-         )%>% 
+  # mutate(ever_changed_poll_loc=(sum(changed_poll_loc)>0),
+  #        ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
+  #        ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0)
+  #        #ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0)
+  #        )%>% 
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
  #mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)),
@@ -284,65 +283,63 @@ two_data$location_category_2019[two_data$year==2017]<-NA
 
 
 ######## Generate propensity scores
-### new poll location without moving
-dvar<-'ever_no_move_new_poll_loc'
-### people who changed polling location without moving and people who didn't change location
-no_chng_or_no_mv_two_data<-two_data%>%
-  filter(((ever_no_move_new_poll_loc==T)|(ever_changed_poll_loc==F))&(ever_moved_new_poll_loc==F))
-
-# remove missing to prevent different length Y1 and Y0
-## Test with subsample
-no_chng_or_no_mv_two_data<-no_chng_or_no_mv_two_data%>%
-  select(all_of(c('voted',dvar,'LALVOTERID','VOTERID','year','County'
-                  ,'Voters_Gender'
-                  ,'Voters_Age','Parties_Description','pred_race',
-                  'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
-                  'known_religious','CommercialData_LikelyUnion',
-                  'CommercialData_OccupationIndustry',
-                  'years_reg'
-  )))%>%
-  filter(complete.cases(.))%>%
-  #filter out voters who aren't in both 2017 and 2019?
-  group_by(LALVOTERID)%>%
-  filter(length(year)==2)%>%
-  ungroup()
+# ### new poll location without moving
+# dvar<-'ever_no_move_new_poll_loc'
+# ### people who changed polling location without moving and people who didn't change location
+# no_chng_or_no_mv_two_data<-two_data%>%
+#   filter(((ever_no_move_new_poll_loc==T)|(ever_changed_poll_loc==F))&(ever_moved_new_poll_loc==F))
+# 
+# # remove missing to prevent different length Y1 and Y0
+# ## Test with subsample
+# no_chng_or_no_mv_two_data<-no_chng_or_no_mv_two_data%>%
+#   select(all_of(c('voted',dvar,'LALVOTERID','VOTERID','year','County'
+#                   ,'Voters_Gender'
+#                   ,'Voters_Age','Parties_Description','pred_race',
+#                   'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+#                   'known_religious','CommercialData_LikelyUnion',
+#                   'CommercialData_OccupationIndustry',
+#                   'years_reg'
+#   )))%>%
+#   filter(complete.cases(.))%>%
+#   #filter out voters who aren't in both 2017 and 2019?
+#   group_by(LALVOTERID)%>%
+#   filter(length(year)==2)%>%
+#   ungroup()
 
 
 # # Create a mini dataframe for testing by sampling from treated and untreated groups
-mini<-no_chng_or_no_mv_two_data%>%
-  group_by('ever_no_move_new_poll_loc')%>%
-  slice_sample(n=1000000)%>%
-  ungroup()%>%
-  mutate(treat=as.integer(ever_no_move_new_poll_loc),
-         Voters_Gender=case_when(
-           Voters_Gender=='M' ~ 0,
-           Voters_Gender=='F'~1,
-           .default = NA
-         ),
-         Voters_Age=as.integer(Voters_Age),
-         Parties_Description=as.integer(Parties_Description),
-         pred_race=as.integer(pred_race),
-         known_religious=as.integer(known_religious),
-         CommercialData_LikelyUnion=as.integer(CommercialData_LikelyUnion),
-         #CommercialData_OccupationGroup=as.integer(CommercialData_OccupationGroup)
-         CommercialData_OccupationIndustry=as.integer(CommercialData_OccupationIndustry)
-  )
+# mini<-two_data%>%
+#   #create treatment indicator (assigned new location in 2019)
+#   group_by(LALVOTERID)%>%
+#   mutate(treat=as.integer(any(no_move_new_poll_loc==T & year==2019)))%>%
+#   ungroup()%>%
+#   group_by('treat')%>%
+#   slice_sample(n=1000000)%>%
+#   ungroup()
+  #convert some variables to integers?
+  # mutate(
+  #        Voters_Gender=case_when(
+  #          Voters_Gender=='M' ~ 0,
+  #          Voters_Gender=='F'~1,
+  #          .default = NA
+  #        ),
+  #        Voters_Age=as.integer(Voters_Age),
+  #        Parties_Description=as.integer(Parties_Description),
+  #        pred_race=as.integer(pred_race),
+  #        known_religious=as.integer(known_religious),
+  #        CommercialData_LikelyUnion=as.integer(CommercialData_LikelyUnion),
+  #        #CommercialData_OccupationGroup=as.integer(CommercialData_OccupationGroup)
+  #        CommercialData_OccupationIndustry=as.integer(CommercialData_OccupationIndustry)
+  # )
 
-full<-no_chng_or_no_mv_two_data%>%
-  mutate(treat=as.integer(ever_no_move_new_poll_loc),
-         Voters_Gender=case_when(
-           Voters_Gender=='M' ~ 0,
-           Voters_Gender=='F'~1,
-           .default = NA
-         ),
-         Voters_Age=as.integer(Voters_Age),
-         Parties_Description=as.integer(Parties_Description),
-         pred_race=as.integer(pred_race),
-         known_religious=as.integer(known_religious),
-         CommercialData_LikelyUnion=as.integer(CommercialData_LikelyUnion)
-         #CommercialData_OccupationGroup=as.integer(CommercialData_OccupationGroup)
-  )
+#remove model data from memory to make room
+rm(model_data)
 
+full<-two_data%>%
+  #create treatment indicator (assigned new location in 2019)
+  group_by(LALVOTERID)%>%
+  mutate(treat=as.integer(any(moved_new_poll_loc==T & year==2019)))
+#mutate(treat=as.integer(any(no_move_new_poll_loc==T & year==2019)))
 
 # fix covariates at 2017 values
 ## Filter data for year 2017
@@ -371,7 +368,9 @@ full <- full %>%
     CommercialData_OccupationIndustry = CommercialData_OccupationIndustry_2017,
     years_reg = years_reg_2017
   )%>%
-  select(-ends_with("_2017"))%>%  # Remove extra columns
+  # Remove extra columns
+  select(-ends_with("_2017"))%>%  
+  ungroup()%>%
   # Remove voters who have missing data
   filter(complete.cases(.))
 
@@ -381,64 +380,6 @@ ps_formula <- treat ~ County +Voters_Gender + Voters_Age + Parties_Description+
   pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
   known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
   years_reg
-
-#' lr_out <- glm(formula = ps_formula,
-#'               data = mini,
-#'               family = binomial(link = 'logit'))
-#' 
-#' ## Add propensity scores to data frame
-#' mini$lr_ps <- fitted(lr_out)
-#' 
-#' ## Examine distribution of propensity scores
-#' ggplot(mini, aes(x = lr_ps, color = as.logical(ever_no_move_new_poll_loc))) + 
-#'   geom_density() +
-#'   guides(col=guide_legend(title='Treated'))+
-#'   xlab('Propensity Score')
-#' 
-#' # Stratify into quintiles and convert all variables to numeric
-#' mini <- mini %>%
-#'   mutate(ps_quintile = ntile(lr_ps, 5))
-#' 
-#' # Get the actual quintile cutpoints
-#' quintile_cutpoints <- quantile(mini$lr_ps, probs = seq(0, 1, 0.2))
-#' 
-#' ## Check stratification
-#' table(mini$treat, mini$ps_quintile)
-#' ## Visalize quantiles
-#' ggplot(mini, aes(x = lr_ps, color = as.logical(treat))) + 
-#'   geom_density() +
-#'   guides(col=guide_legend(title='Treated'))+
-#'   xlab('Propensity Score')+
-#'   geom_vline(xintercept = quintile_cutpoints)
-#' 
-#' # Check balance
-#' ## Simple comparison of means within strata
-#' PSAgraphics::box.psa(continuous = mini$years_reg, 
-#'                      treatment = mini$treat, 
-#'                      strata = mini$ps_quintile,
-#'                      xlab = "Strata", 
-#'                      balance = FALSE)
-#' ## Simple comparison of proportions within strata
-#' PSAgraphics::cat.psa(categorical = mini$CommercialData_OccupationGroup, 
-#'                      treatment = mini$ever_no_move_new_poll_loc, 
-#'                      strata = mini$ps_quintile, 
-#'                      xlab = 'Strata',
-#'                      balance = FALSE)
-#' 
-#' ## Compare covariate effect size to check balance
-#' covars <- c('treat','Voters_Gender','Voters_Age','County',
-#'             'Parties_Description','pred_race',
-#'             'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
-#'               'known_religious','CommercialData_LikelyUnion',
-#'             #'CommercialData_OccupationGroup',
-#'               'years_reg')
-#' covars <- data.frame(mini[,covars[-1]])
-#' #All variables must be numeric for the function to work
-#' PSAgraphics::cv.bal.psa(covariates = covars, 
-#'                         treatment = mini$treat,
-#'                         propensity = mini$lr_ps,
-#'                         strata = mini$ps_quintile)
-
 
 ########## DiD
 # Matching using MatchIt package
@@ -463,7 +404,7 @@ t.test(voted ~ treat, data = logit.match)
 new_loc.t<-t.test(voted ~ treat, data = logit.match)
 chars <- capture.output(print(new_loc.t))
 writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
-                                    "new_location_t_test_2_12_26.txt"))
+                                    "moved_location_t_test_2019_3_3_26.txt"))
 )
 
 
@@ -475,7 +416,7 @@ fit1 <- glm(voted ~ treat,
 summary(fit1)
 chars <- capture.output(print(summary(fit1)))
 writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
-                                    "new_location_glm_no_covars_2_12_26.txt"))
+                                    "moved_location_glm_no_covars_2019_3_3_26.txt"))
 )
 #estimate ATT
 fit1.ATT<-avg_comparisons(fit1,
@@ -485,7 +426,8 @@ fit1.ATT<-avg_comparisons(fit1,
                 ## "this formula is passed to the cluster argument of the sandwich::vcovCL function"
                 ## Clustering on matches created by prop score matching?
                 vcov = ~subclass,
-                # selects the subset of the dataset used to fit the model
+                # Subset of values at which the model is evaluated
+                ## So using the subset of values treated observations gives ATT
                 newdata = subset(treat == 1),
                 # Calculate relative risk
                 comparison = "lnratioavg",
@@ -493,10 +435,44 @@ fit1.ATT<-avg_comparisons(fit1,
 fit1.ATT
 chars <- capture.output(print(fit1.ATT))
 writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
-                                    "new_location_glm_no_covars_ATT_2_12_26.txt"))
+                                    "moved_location_glm_no_covars_ATT_2019_3_3_26.txt"))
 )
 
 
+#binomial model w/ covariates
+fit2 <- glm(voted ~ treat+Voters_Gender + Voters_Age + Parties_Description+
+                     pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                     known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                     years_reg,
+                   data = logit.match,
+                   family = binomial(link = 'logit'),
+                   weights = weights)
+
+summary(fit2)
+chars <- capture.output(print(summary(fit2)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "moved_location_glm_covars_17_19_3_3_26.txt"))
+)
+#estimate ATT
+fit2.ATT<-avg_comparisons(fit2,
+                                 # Variables to estimate the effect for
+                                 variables = "treat",
+                                 # I think variables also determines the clustering of the errors?:
+                                 ## "this formula is passed to the cluster argument of the sandwich::vcovCL function"
+                                 ## Clustering on matches created by prop score matching?
+                                 vcov = ~subclass,
+                                 # selects the subset of the dataset used to fit the model
+                                 newdata = subset(treat == 1),
+                                 # Calculate relative risk
+                                 comparison = "lnratioavg",
+                                 transform = "exp")
+fit2.ATT
+chars <- capture.output(print(fit2.ATT))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/",
+                                    "moved_location_glm_covars_ATT_17_19_3_3_26.txt"))
+)
+
+#### Alternate matching model
 ## PSM nearest neighbor
 ##m.nn<-matchit(lalonde.formu, data = lalonde, caliper=0.1, method ="nearest")
 m.nn<-matchit(ps_formula, data = mini, ratio = 1, method ="nearest")
