@@ -143,25 +143,28 @@ two_data<-model_data%>%
   )%>% 
   #create single variable that indicates if someone voted in a given year
   ## ...or in this case voted in 2017 or 2019
+  #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
-  #mutate(voted = ((year==2018 & General_2018_11_06==1)|(year==2019 & General_2019_11_05==1)),
-  #mutate(voted = ((year==2017 & General_2017_11_07==1)|(year==2019 & General_2019_11_05==1)),
-  mutate(voted = ((year==2017 & General_2017_11_07==1)|(year==2018 & General_2018_11_06==1)),
-         ## Calculate years registered by 2017
-         years_reg = 2017-as.numeric(year_reg))%>%
+  mutate(voted = ((year==2016 & General_2016_11_08==1)
+                  |(year==2017 & General_2017_11_07==1)
+                  |(year==2018 & General_2018_11_06==1)
+                  |(year==2019 & General_2019_11_05==1)))%>%
   ungroup()%>%
-  #remove duplicate voters (not sure where they came from)
+  ## Calculate years registered by 2017
+  mutate(years_reg = 2017-as.numeric(year_reg))%>%
+  ungroup()%>%
+  #remove duplicate records (not sure where they came from)
   distinct(LALVOTERID, year, .keep_all = T)
 #set missing voted to 0?
 #two_data$voted[is.na(two_data$voted)]<-F
 
 ###### Split location category into years
-two_data$location_category_2017<-two_data$location_category
-two_data$location_category_2017[two_data$year==2018]<-NA
-two_data$location_category_2018<-two_data$location_category
-two_data$location_category_2018[two_data$year==2017]<-NA
-# two_data$location_category_2019<-two_data$location_category
-# two_data$location_category_2019[two_data$year==2017]<-NA
+#two_data$location_category_2017<-two_data$location_category
+#two_data$location_category_2017[two_data$year==2019]<-NA
+#two_data$location_category_2018<-two_data$location_category
+#two_data$location_category_2018[two_data$year==2017]<-NA
+#two_data$location_category_2019<-two_data$location_category
+#two_data$location_category_2019[two_data$year==2017]<-NA
 
 
 ######## Generate propensity scores
@@ -205,25 +208,94 @@ ps_formula <- parent_new_poll_school ~  Voters_Gender + Voters_Age + Parties_Des
 
 ################## Test on parents/schools
 ### Parents who changed polling station to a school vs. not a school
+#### Just 2019
 voters_parents_two_data<-two_data%>%
   # only parents
   filter(has_child==T)%>%
   group_by(LALVOTERID)%>%
   # only people who have changed polling location without moving after 201X
   ## any() means if any row in the group fulfills the condition all rows are kept
-  filter(any(no_move_new_poll_loc==T & year==2018))%>%
+  filter(any(no_move_new_poll_loc==T & year==2019))%>%
   mutate(
-    # Whether new polling location is a school
-    parent_new_poll_school = sum(((location_category=='school')&(year==2018)),
-                                 na.rm=T)>0
+    # Whether new polling location in 2019 is a school
+    parent_new_poll_school = ifelse(
+      ((location_category=='school')&(year==2019)),T,F)
   )%>%
-  ungroup()
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'no_move_new_poll_loc','parent_new_poll_school',
+                  'General_2017_11_07','General_2018_11_06','General_2019_11_05',
+                  'voted'
+                  )))
+####
 
+#### 2019 or 2018 if they didn't vote in 2018
+# Get 2018 cases
+voters_parents_two_data_2018<-two_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # only parents
+  filter(has_child==T)%>%
+  group_by(LALVOTERID)%>%
+  # only people who have changed polling location without moving after 201X
+  ## any() means if any row in the group fulfills the condition all rows are kept
+  ## People who changed in 2018, but didn't vote in 2018
+  filter(any((no_move_new_poll_loc==1) & (year==2018) & (General_2018_11_06==0)),
+         ##  And didn't change poll location in 2019
+         any((year==2019) & (no_move_new_poll_loc==0) & (moved_new_poll_loc==0)))%>%
+  ungroup()%>%
+  mutate(
+    # Whether got a new polling location in 2018 and it was a school or not 
+    parent_new_poll_school = ifelse(
+      ((location_category=='school')&(year==2018)),T,F)
+  )
+
+# Get 2019 cases
+voters_parents_two_data_2019<-two_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # only parents
+  filter(has_child==T)%>%
+  group_by(LALVOTERID)%>%
+  # only people who have changed polling location without moving after 201X
+  ## any() means if any row in the group fulfills the condition all rows are kept
+  filter(any(no_move_new_poll_loc==1 & year==2019))%>%
+  ungroup()%>%
+  # Whether got a new polling location in 2019 and it was a school or not
+  mutate(parent_new_poll_school = ifelse(
+    ((location_category=='school')&(year==2019)),T,F))
+
+#Combine 2018 and 2019 cases
+voters_parents_two_data<-rbind(voters_parents_two_data_2018, voters_parents_two_data_2019)%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'no_move_new_poll_loc',
+                  'parent_new_poll_school',
+                  'General_2017_11_07','General_2018_11_06','General_2019_11_05',
+                  'voted'
+  )))
+rm(voters_parents_two_data_2018, voters_parents_two_data_2019)
+####
+
+# Convert treatment and outcome variable to numeric
 voters_parents_two_data['parent_new_poll_school'] <- sapply(voters_parents_two_data['parent_new_poll_school'],as.numeric)
 voters_parents_two_data$voted<-as.numeric(voters_parents_two_data$voted)
 
 
-# fix covariates at 2017 values
+# fix covariates at 201X (first time period) values
 ## Filter data for year 2017
 voters_parents_two_data_2017 <- voters_parents_two_data %>%
   filter(year == 2017) %>%
@@ -253,6 +325,18 @@ voters_parents_two_data <- voters_parents_two_data %>%
   select(-ends_with("_2017"))%>%  # Remove extra columns
   # Remove voters who have missing data
   filter(complete.cases(.))
+# Remove 2017 dataframe
+rm(voters_parents_two_data_2017)
+
+######## Save crosstabs of category counts
+test<-voters_parents_two_data%>%
+  group_by(County,parent_new_poll_school)%>%
+  summarize(num=length(unique(LALVOTERID)))%>%
+  pivot_wider(id_cols = County,names_from = parent_new_poll_school,
+              values_from = num)
+
+write.csv(test,paste0(results_dir,'temp.csv'))
+#########
 
 ## Default logistic regression calculated propensity score matching
 ### no replacement, one control to one treated
