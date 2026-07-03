@@ -821,9 +821,13 @@ change_location_two_data <- change_location_two_data %>%
 rm(change_location_two_data_2017)
 
 ## Default nearest neighbor calculated propensity score matching ####
-# Filter to pre-treatment period only
+# filter data so only voters present in 2017 and 2019 are included
+## otherwise end up with treated voters matched to incomplete controls
 pre_data <- change_location_two_data%>%
-  filter(year == 2017)
+  group_by(LALVOTERID)%>%
+  filter(any(year==2017) & any(year==2019))%>%
+  ungroup()%>%
+  filter(year==2017)
 # Run matching (1:1 nearest neighbor propensity score matching, no replacement)
 match_out <- matchit(
   ps_formula,
@@ -845,10 +849,7 @@ match_out_data<-match.data(match_out)
 ## voter id and clusterid
 match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
 # Add back into model data
-matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')%>%
-  # Remove any matched pairs missing an observation in one year
-  group_by(subclass)%>%
-  filter(n()==4)
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
 #####
 ### T-test to examine baseline voting frequency ####
 test_year=2019
@@ -896,9 +897,10 @@ writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/s
                                     subpopulation,"_moved_new_location_vs_not_twfe_covars_cse_17_19_6_30_26.txt")))
 ############
 # #####
+
 #### 2019 or 2018 if they didn't vote in 2018 ####
-# Flag voters treated in 2018 or 2019 seprately because it makes filtering easier
-change_location_two_data<-two_data%>%
+# Flag voters treated in 2018 or 2019 separately because it makes filtering easier?
+change_location_two_data_19<-two_data%>%
   filter(County %in% c('PHILADELPHIA'))%>%
   # Registered to vote in 2019
   filter(!is.na(General_2019_11_05))%>%
@@ -912,19 +914,34 @@ change_location_two_data<-two_data%>%
     moved_new_poll_treated = 
       any((moved_new_poll_loc==1)&(year==2019))
   )%>%
-  
+  ungroup()
+# Voters treated in 2018
+## Ignore voters with 2019 treatment indicator when flagging 2018 voters for treatment
+##  ...to avoid overwriting
+change_location_two_data_18_treated<-two_data%>%
+  filter(County %in% c('PHILADELPHIA'))%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # Hasn't been identified as treated in 2019
+  filter(LALVOTERID%!in%change_location_two_data_19$LALVOTERID['moved_new_poll_treated'==T])%>%
+  group_by(LALVOTERID)%>%
+  # remove voters who changed location without moving
+  filter(
+    # In 2018 or 2019
+    !any((no_move_new_poll_loc==1)&(year==2018)),
+    !any((no_move_new_poll_loc==1)&(year==2019)))%>%
   mutate(
-    new_poll_treated = 
-      # Whether new polling location in 2019 or not
-      (any((changed_poll_loc>0)&(year==2019)))
-    |
-      # Whether new polling location in 2018, but didn't vote in 2018 and then didn't change in 2019
-      any((
-        (changed_poll_loc>0)&(year==2018)&(General_2018_11_06==0)
-      )& any(
-        (year==2019)&(changed_poll_loc==0)
-      ))
+    # Whether new polling location in 2018 or not and didn't vote
+    moved_new_poll_treated = 
+      any((moved_new_poll_loc==1)&(year==2018)&(General_2018_11_06==0))
   )%>%
+  filter(any(moved_new_poll_treated==T))%>%
+  ungroup()
+# Merge 2018 and 2019 data
+## Replace the 2018 treated voters in the 2019 data frame
+### Avoid rbind to prevent duplication since 2018 treated voters are untreated in the 2019 frame
+change_location_two_data<-rows_update(change_location_two_data_19,change_location_two_data_18_treated,
+                                      by=c('LALVOTERID','year'))%>%
   select(all_of(c('LALVOTERID','year','Voters_Gender', 'Voters_Age', 
                   'Parties_Description', 
                   'pred_race','CommercialData_EstimatedHHIncomeAmount', 
@@ -933,10 +950,9 @@ change_location_two_data<-two_data%>%
                   #'CommercialData_OccupationGroup',
                   'CommercialData_OccupationIndustry',
                   'years_reg','Shape_Length',
-                  'new_poll_treated',
+                  'moved_new_poll_treated',
                   'voted'
-  )))%>%
-  ungroup()
+  )))
 
 # Convert treatment and outcome variable to numeric for matching function?
 change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
@@ -1007,20 +1023,20 @@ matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
 test_year=2019
 t_test_data<-matched_panel%>%
   filter(year==test_year)
-t.test(data=t_test_data, voted ~ new_poll_treated)
-chars <- capture.output(print(t.test(data=t_test_data, voted ~ new_poll_treated)))
+t.test(data=t_test_data, voted ~ moved_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ moved_new_poll_treated)))
 writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
-                                    subpopulation,"_new_location_vs_not_matched_t_test_",as.character(test_year),".txt")))
+                                    subpopulation,"_moved_new_location_vs_not_matched_t_test_incl2018_",as.character(test_year),".txt")))
 t_test_data<-change_location_two_data%>%
   filter(year==test_year)
-t.test(data=t_test_data, voted ~ new_poll_treated)
-chars <- capture.output(print(t.test(data=t_test_data, voted ~ new_poll_treated)))
+t.test(data=t_test_data, voted ~ moved_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ moved_new_poll_treated)))
 writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
-                                    subpopulation,"_new_location_vs_not_all_obs_t_test_",as.character(test_year),".txt")))
+                                    subpopulation,"moved_new_location_vs_not_all_obs_t_test_incl2018_",as.character(test_year),".txt")))
 # ####
 ############# Run two way fixed effects ##########
 #binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
-# base.fit1 <- glm(voted ~ new_poll_treated*factor(year),
+# base.fit1 <- glm(voted ~ moved_new_poll_treated*factor(year),
 #                  data = matched_panel,
 #                  family = binomial(link = 'logit'))
 # summary(base.fit1)
@@ -1030,9 +1046,9 @@ writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/s
 # print(summary_clustered)
 # chars <- capture.output(print(summary_clustered))
 # writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
-#                                     subpopulation,"_new_location_vs_not_twfe_no_covars_cse_17_1819_6_30_26.txt")))
+#                                     subpopulation,"_moved_new_location_vs_not_twfe_no_covars_cse_17_1819_6_30_26.txt")))
 #binomial model w/ covariates
-base.fit2 <- glm(voted ~ new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
+base.fit2 <- glm(voted ~ moved_new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
                    Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
                    Residence_Families_HHCount+known_religious+
                    CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
@@ -1046,7 +1062,7 @@ summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
 print(summary_clustered)
 chars <- capture.output(print(summary_clustered))
 writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
-                                    subpopulation,"_new_location_vs_not_twfe_covars_cse_17_1819_6_30_26.txt")))
+                                    subpopulation,"_moved_new_location_vs_not_twfe_covars_cse_17_1819_6_30_26.txt")))
 ############
 # #####
 
@@ -1192,8 +1208,8 @@ change_location_two_data<-two_data%>%
   filter(!any((moved_new_poll_loc==1)&(year==2019)))%>%
   mutate(
     # Whether new polling location in 2019 or not
-    no_move_new_poll_treated = ifelse(
-      any((no_move_new_poll_loc==1)&(year==2019)),T,F)
+    no_move_new_poll_treated = 
+      any((no_move_new_poll_loc==1)&(year==2019))
   )%>%
   ungroup()%>%
   select(all_of(c('LALVOTERID','year','Voters_Gender', 'Voters_Age', 
@@ -1230,9 +1246,13 @@ change_location_two_data <- change_location_two_data %>%
 rm(change_location_two_data_2017)
 
 ## Default nearest neighbor calculated propensity score matching ####
-# Filter to pre-treatment period only
+# filter data so only voters present in 2017 and 2019 are included
+## otherwise end up with treated voters matched to incomplete controls
 pre_data <- change_location_two_data%>%
-  filter(year == 2017)
+  group_by(LALVOTERID)%>%
+  filter(any(year==2017) & any(year==2019))%>%
+  ungroup()%>%
+  filter(year==2017)
 # Run matching (1:1 nearest neighbor propensity score matching, no replacement)
 match_out <- matchit(
   ps_formula,
@@ -1254,10 +1274,7 @@ match_out_data<-match.data(match_out)
 ## voter id and clusterid
 match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
 # Add back into model data
-matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')%>%
-  # Remove any matched pairs missing an observation in one year
-  group_by(subclass)%>%
-  filter(n()==4)
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
 #####
 ### T-test to examine baseline voting frequency ####
 test_year=2019
@@ -1305,6 +1322,176 @@ writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/s
                                     subpopulation,"_no_move_new_location_vs_not_twfe_covars_cse_17_19_6_30_26.txt")))
 ############
 # #####
+
+#### 2019 or 2018 if they didn't vote in 2018 ####
+# Flag voters treated in 2018 or 2019 separately because it makes filtering easier?
+change_location_two_data_19<-two_data%>%
+  filter(County %in% c('PHILADELPHIA'))%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  group_by(LALVOTERID)%>%
+  # remove voters who changed location by moving
+  filter(
+    # In 2019
+    !any((moved_new_poll_loc==1)&(year==2019)))%>%
+  mutate(
+    # Whether new polling location in 2019 or not
+    no_move_new_poll_treated = 
+      any((no_move_new_poll_loc==1)&(year==2019))
+  )%>%
+  ungroup()
+# Voters treated in 2018
+## Ignore voters with 2019 treatment indicator when flagging 2018 voters for treatment
+##  ...to avoid overwriting
+change_location_two_data_18_treated<-two_data%>%
+  filter(County %in% c('PHILADELPHIA'))%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # Hasn't been identified as treated in 2019
+  filter(LALVOTERID%!in%change_location_two_data_19$LALVOTERID['moved_new_poll_treated'==T])%>%
+  group_by(LALVOTERID)%>%
+  # remove voters who changed location by moving
+  filter(
+    # In 2018 or 2019
+    !any((moved_new_poll_loc==1)&(year==2018)),
+    !any((moved_new_poll_loc==1)&(year==2019)))%>%
+  mutate(
+    # Whether new polling location in 2018 or not and didn't vote
+    no_move_new_poll_treated = 
+      any((no_move_new_poll_loc==1)&(year==2018)&(General_2018_11_06==0))
+  )%>%
+  filter(any(no_move_new_poll_treated==T))%>%
+  ungroup()
+# Merge 2018 and 2019 data
+## Replace the 2018 treated voters in the 2019 data frame
+### Avoid rbind to prevent duplication since 2018 treated voters are untreated in the 2019 frame
+change_location_two_data<-rows_update(change_location_two_data_19,change_location_two_data_18_treated,
+                                      by=c('LALVOTERID','year'))%>%
+  select(all_of(c('LALVOTERID','year','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg','Shape_Length',
+                  'no_move_new_poll_treated',
+                  'voted'
+  )))
+
+# Convert treatment and outcome variable to numeric for matching function?
+change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
+
+# Create fixed covariates with 2017 (pre-treatment) values
+## Filter data for year 2017
+change_location_two_data_2017 <- change_location_two_data %>%
+  filter(year == 2017) %>%
+  select(all_of(c('LALVOTERID','Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg','Shape_Length')))
+## Join back to the original dataset
+change_location_two_data <- change_location_two_data %>%
+  left_join(change_location_two_data_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
+  mutate(
+    Voters_Gender = Voters_Gender_2017,
+    Voters_Age = Voters_Age_2017,
+    Parties_Description = Parties_Description_2017,
+    pred_race = pred_race_2017,
+    CommercialData_EstimatedHHIncomeAmount = CommercialData_EstimatedHHIncomeAmount_2017,
+    Residence_Families_HHCount = Residence_Families_HHCount_2017,
+    known_religious = known_religious_2017,
+    CommercialData_LikelyUnion = CommercialData_LikelyUnion_2017,
+    #CommercialData_OccupationGroup = CommercialData_OccupationGroup_2017,
+    CommercialData_OccupationIndustry = CommercialData_OccupationIndustry_2017,
+    years_reg = years_reg_2017
+  )%>%
+  select(-ends_with("_2017"))%>%  # Remove extra columns
+  # Remove voters who have missing data
+  filter(complete.cases(.))
+# Remove 2017 dataframe
+rm(change_location_two_data_2017)
+
+## Default nearest neighbor calculated propensity score matching ####
+pre_data <- change_location_two_data%>%
+  group_by(LALVOTERID)%>%
+  # Only keep voters with complete set of pre and post treatment years
+  filter(any(year==2017) & any(year==2019))%>%
+  ungroup()%>%
+  filter(year==2017)
+# Run matching (1:1 nearest neighbor propensity score matching, no replacement)
+match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+love.plot(match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(match_out)$LALVOTERID
+matched_panel <- change_location_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2018)
+# Extract cluster/pair ids for robust errors later
+## Matched data object
+match_out_data<-match.data(match_out)
+## voter id and clusterid
+match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
+# Add back into model data
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
+#####
+### T-test to examine baseline voting frequency ####
+test_year=2019
+t_test_data<-matched_panel%>%
+  filter(year==test_year)
+t.test(data=t_test_data, voted ~ no_move_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ no_move_new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    subpopulation,"_no_move_new_location_vs_not_matched_t_test_incl2018_",as.character(test_year),".txt")))
+t_test_data<-change_location_two_data%>%
+  filter(year==test_year)
+t.test(data=t_test_data, voted ~ no_move_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ no_move_new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    subpopulation,"_no_move_new_location_vs_not_all_obs_t_test_incl2018_",as.character(test_year),".txt")))
+# ####
+############# Run two way fixed effects ##########
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+base.fit1 <- glm(voted ~ no_move_new_poll_treated*factor(year),
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit1)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    subpopulation,"_no_move_new_location_vs_not_twfe_no_covars_cse_17_1819_6_30_26.txt")))
+#binomial model w/ covariates
+base.fit2 <- glm(voted ~ no_move_new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
+                   Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+                   Residence_Families_HHCount+known_religious+
+                   CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                   years_reg,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit2)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit2, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    subpopulation,"_no_move_new_location_vs_not_twfe_covars_cse_17_1819_6_30_26.txt")))
+############
+# #####
+
 
 ##Big Cities
 subpopulation<-'Big_Cities'
