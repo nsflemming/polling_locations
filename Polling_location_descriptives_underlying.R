@@ -75,8 +75,7 @@ factorize_set_ref<-function(data, loc_cat, ref_cat){
 ################## Main
 ### set directories
 data_dir <- 'C:\\Users\\natha\\Desktop\\Polling Places DiD\\data'
-### set year
-#year='2017'
+
 
 ## Create vector of location category labels
 loc_labels_NAsettoOther<-c('Public Location','Public/Justice Location','Other',
@@ -85,9 +84,7 @@ loc_labels_NAsettoOther<-c('Public Location','Public/Justice Location','Other',
                            'Catholic School','Catholic Church','Catholic Location',
                            'Fire Station','Police Station','Religious','Post Office',
                            'Court House','Government','MISSING','Insufficient Info')
-# loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
-#                            'Public Location','Public/Justice Location','Religious Location',
-#                            'Religious School','School')
+
 ## Create dictionary of location labels
 loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
             'other'='Other','relig_loc'='Religious Location','school'='School',
@@ -122,7 +119,7 @@ other_cond='NAsettoOther'
 #loc_labels=loc_labels_OthersettoNA
 loc_labels=loc_labels_NAsettoOther
 
-## Create simplified location categories variable 
+## Create simplified location categories variable ####
 poll_data_all<-poll_data_all%>%
   mutate(location_category_simpl = case_when(
     location_category=='apartment' ~ 'apartment building',
@@ -132,18 +129,13 @@ poll_data_all<-poll_data_all%>%
     location_category=='art center' ~ 'community center',
     location_category=='post office' ~ 'government',
     location_category=='government' ~ 'government',
-    location_category=='government/police' ~ 'government/justice',
+    #location_category=='government/police' ~ 'government/justice',
+    location_category=='government/police' ~ 'government',
+    location_category=='government/firestation' ~ 'government',
     location_category=='courthouse' ~ 'justice',
     location_category=='police station' ~ 'justice',
     location_category=='religious school' ~ 'religious',
     location_category=='catholic school' ~ 'religious',
-    # #Military buildings on its own
-    #location_category=='military' ~ 'military',
-    # #Grouping military with veteran association buildings
-    location_category=='military' ~ 'military/veteran',
-    location_category=='veteran' ~ 'military/veteran',
-    ## Folding in gov/milit too since it's a small category with a large effect
-    location_category=='government/military' ~ 'military/veteran',
     location_category=='association' ~ 'association/club/sport/union',
     location_category=='club' ~ 'association/club/sport/union',
     location_category=='sport' ~ 'association/club/sport/union',
@@ -155,9 +147,15 @@ poll_data_all<-poll_data_all%>%
     location_category=='restaurant' ~ 'business',
     location_category=='nursing home' ~ 'retirement community/nursing home',
     location_category=='retirement community' ~ 'retirement community/nursing home',
+    # #Grouping military with veteran association buildings
+    #location_category=='military' ~ 'military/veteran',
+    #location_category=='veteran' ~ 'military/veteran',
+    ## Folding in gov/milit too since it's a small category with a large effect
+    location_category=='government/military' ~ 'other',
     # #Grouping most smaller categories we haven't theorized about together into 'other'
-    # location_category=='military' ~ 'other',
-    # location_category=='veteran' ~ 'other',
+    location_category=='business' ~ 'other', 
+    location_category=='military' ~ 'other',
+    location_category=='veteran' ~ 'other',
     # location_category=='association' ~ 'other',
     # location_category=='club' ~ 'other',
     # location_category=='sport' ~ 'other',
@@ -167,35 +165,37 @@ poll_data_all<-poll_data_all%>%
     location_category=='museum' ~ 'other',
     location_category=='hotel' ~ 'other',
     location_category=='monument' ~ 'other',
+    location_category=='medical' ~ 'other',
     location_category=='recreation facility' ~ 'other',
     location_category=='airport' ~ 'other',
     location_category=='mobile home park' ~ 'other',
+    location_category=='park' ~ 'other',
     location_category=='private residence' ~ 'other',
+    location_category=='public/subsidized housing' ~ 'other',
     # Should have been recategorized to other earlier...
     location_category=='religious/government' ~ 'other',
-    # Fix spelling
-    location_category=='government/firestation' ~ 'government/fire station',
     .default = location_category
   ))
+#####
 
 ## recode missing/insufficient info location category to other or vice versa
-poll_data_all<-recode_NAtoOther(poll_data_all,'location_category')
+#poll_data_all<-recode_NAtoOther(poll_data_all,'location_category')
 poll_data_all<-recode_NAtoOther(poll_data_all,'location_category_simpl')
 #poll_data<-recode_OthertoNA(poll_data,'location_category')
 
 ## Factorize location categories and set reference categories
-poll_data_all<-factorize_set_ref(poll_data_all,'location_category',
-                             ref_cat = 'other')
+#poll_data_all<-factorize_set_ref(poll_data_all,'location_category',
+#                             ref_cat = 'other')
 poll_data_all<-factorize_set_ref(poll_data_all,'location_category_simpl',
                                  ref_cat = 'other')
 
 ## manipulate poll data into plotting data
 ### Full set of categories
-poll_data_all_full<-poll_data_all%>%
-  group_by(year,location_category)%>%
-  summarize(num_locs=n())%>%
-  mutate(prop_locs=num_locs/sum(num_locs))%>%
-  ungroup()
+# poll_data_all_full<-poll_data_all%>%
+#   group_by(year,location_category)%>%
+#   summarize(num_locs=n())%>%
+#   mutate(prop_locs=num_locs/sum(num_locs))%>%
+#   ungroup()
 ### Simplified set of categories
 poll_data_all_simpl<-poll_data_all%>%
   group_by(year,location_category_simpl)%>%
@@ -203,15 +203,10 @@ poll_data_all_simpl<-poll_data_all%>%
   mutate(prop_locs=num_locs/sum(num_locs))%>%
   ungroup()
 
-#rename location categories for plotting
-# levels(poll_data_all$location_category_simpl)<-c('Other', 'Justice', 'Library',
-#                                                  'Multiple', 'Public', 'Public/Justice',
-#                                                  'Religious','Religious School','School')
-
 
 # Get table of locations with multiple categories
-multiple_categories<-poll_data_all%>%
-  filter(str_detect(location_category,".*/.*"))
+# multiple_categories<-poll_data_all%>%
+#   filter(str_detect(location_category,".*/.*"))
 #write.csv(multiple_categories,
 #          paste0('C:\\Users\\natha\\Desktop\\Polling Places DiD\\plots\\Location Categories\\',
 #                 'Locations_with_Multiple_Categories_Table.csv'))
@@ -235,6 +230,125 @@ ggplot(poll_data_all_simpl, aes(x=fct_reorder(location_category_simpl, prop_locs
         axis.text.y = element_text(size = 15))
 
 
+############# Plot proportion of polling locations in each category Philadelphia vs. Rest of PA #####
+### read in poll location file
+poll_data17<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_multcat_govsource_underlying17.csv'))%>%
+  select(c(CountyName,location_category))
+poll_data18<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_multcat_govsource_underlying18.csv'))%>%
+  select(c(CountyName,location_category))
+poll_data19<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_multcat_govsource_underlying19.csv'))%>%
+  select(c(CountyName,location_category))
+# poll_data20<-read.csv(paste0(data_dir,'\\poll_struct_key_cath_manual_govsource_underlying20.csv'))%>%
+#   select(c(location_category))
+###combine years of poll data
+poll_data17$year<-2017
+poll_data18$year<-2018
+poll_data19$year<-2019
+# poll_data20$year<-2020
+poll_data_all<-rbind(poll_data17,poll_data18,poll_data19)
+rm(poll_data17,poll_data18,poll_data19)
+## set how 'other' and/or NA category is treated (shouldn't be any NA though, just insufficient info)
+#other_cond='OthersettoNA'
+other_cond='NAsettoOther'
+#loc_labels=loc_labels_OthersettoNA
+loc_labels=loc_labels_NAsettoOther
+
+## Create simplified location categories variable ####
+poll_data_all<-poll_data_all%>%
+  mutate(location_category_simpl = case_when(
+    location_category=='apartment' ~ 'apartment building',
+    location_category=='public center' ~ 'community center',
+    location_category=='senior center' ~ 'community center',
+    location_category=='public center/senior center' ~ 'community center',
+    location_category=='art center' ~ 'community center',
+    location_category=='post office' ~ 'government',
+    location_category=='government' ~ 'government',
+    #location_category=='government/police' ~ 'government/justice',
+    location_category=='government/police' ~ 'government',
+    location_category=='government/firestation' ~ 'government',
+    location_category=='courthouse' ~ 'justice',
+    location_category=='police station' ~ 'justice',
+    location_category=='religious school' ~ 'religious',
+    location_category=='catholic school' ~ 'religious',
+    location_category=='association' ~ 'association/club/sport/union',
+    location_category=='club' ~ 'association/club/sport/union',
+    location_category=='sport' ~ 'association/club/sport/union',
+    location_category=='union' ~ 'association/club/sport/union',
+    location_category=='association/union' ~ 'association/club/sport/union',
+    location_category=='sports association' ~ 'association/club/sport/union',
+    ## Should have been recoded to association earlier...
+    location_category=='event space' ~ 'association/club/sport/union',
+    location_category=='restaurant' ~ 'business',
+    location_category=='nursing home' ~ 'retirement community/nursing home',
+    location_category=='retirement community' ~ 'retirement community/nursing home',
+    # #Grouping military with veteran association buildings
+    #location_category=='military' ~ 'military/veteran',
+    #location_category=='veteran' ~ 'military/veteran',
+    ## Folding in gov/milit too since it's a small category with a large effect
+    location_category=='government/military' ~ 'other',
+    # #Grouping most smaller categories we haven't theorized about together into 'other'
+    location_category=='business' ~ 'other', 
+    location_category=='military' ~ 'other',
+    location_category=='veteran' ~ 'other',
+    # location_category=='association' ~ 'other',
+    # location_category=='club' ~ 'other',
+    # location_category=='sport' ~ 'other',
+    # location_category=='union' ~ 'other',
+    location_category=='insufficient info' ~ 'other',
+    location_category=='stadium' ~ 'other',
+    location_category=='museum' ~ 'other',
+    location_category=='hotel' ~ 'other',
+    location_category=='monument' ~ 'other',
+    location_category=='medical' ~ 'other',
+    location_category=='recreation facility' ~ 'other',
+    location_category=='airport' ~ 'other',
+    location_category=='mobile home park' ~ 'other',
+    location_category=='park' ~ 'other',
+    location_category=='private residence' ~ 'other',
+    location_category=='public/subsidized housing' ~ 'other',
+    # Should have been recategorized to other earlier...
+    location_category=='religious/government' ~ 'other',
+    .default = location_category
+  ))
+#####
+
+## recode missing/insufficient info location category to other or vice versa
+poll_data_all<-recode_NAtoOther(poll_data_all,'location_category_simpl')
+
+## Factorize location categories and set reference categories
+poll_data_all<-factorize_set_ref(poll_data_all,'location_category_simpl',
+                                 ref_cat = 'other')
+
+### Simplified set of categories
+poll_data_all_simpl<-poll_data_all%>%
+  mutate(CountyName = ifelse(CountyName!='PHILADELPHIA','Rest of PA','Philadelphia'))%>%
+  group_by(year, CountyName, location_category_simpl)%>%
+  summarize(num_locs=n())%>%
+  mutate(prop_locs=num_locs/sum(num_locs))%>%
+  ungroup()
+
+# plot proportions for simplified categories
+ggplot(poll_data_all_simpl, aes(x=fct_reorder(location_category_simpl, prop_locs), 
+                                y=prop_locs, fill=CountyName))+
+  geom_col(position='dodge')+
+  labs(title='Percentage of Polling Locations in Each Location Category',
+       x='Location Category',
+       y='Percentage of Locations',
+       fill='County')+
+  theme_minimal()+
+  scale_y_continuous(labels = scales::percent)+
+  scale_fill_brewer(palette='Blues')+
+  theme(plot.title = element_text(size = 25),
+        axis.text.x = element_text(size=15, angle=45,hjust = 0.95,
+                                   vjust = 1),
+        axis.title.y = element_text(size = 20),
+        axis.text.y = element_text(size = 20),
+        axis.title.x = element_text(size = 20),
+        strip.text = element_text(size = 15),
+        legend.text = element_text(size=20),
+        legend.title = element_text(size=20))+
+  facet_wrap(~year, nrow=3)
+# ####
 
 ####### Count/proportion of polling locations that changed year to year########
 ### read in poll location file
@@ -272,7 +386,6 @@ poll_data20<-poll_data20%>%
 poll_data17$year<-'2017/2018'
 poll_data18$year<-'2018/2019'
 poll_data19$year<-'2019/2020'
-#poll_data20$year<-''
 
 # Find number of locations that change year to year (addresses not present next year)
 chng_17.18 <- poll_data17[poll_data17$address %!in% poll_data18$address,]%>%
@@ -291,9 +404,6 @@ chng_17.19 <- poll_data17[poll_data17$address %!in% poll_data19$address,]%>%
 
 # Combine years of location change data
 poll_chng_data_all<-rbind(chng_17.18,chng_18.19,chng_19.20,chng_17.19)
-
-test<-poll_data17%>%
-  distinct()
 
 # Plot combined years and 17 to 19
 ## Reformat to plottable data
@@ -371,7 +481,7 @@ ggplot(chng_17.19, aes(x=year, y=prop_chngd))+
 rm(poll_data17,poll_data18,poll_data19, chng_17.18, chng_18.19,chng_19.20)
 
 
-############ Plot Proportion of voters in each location category
+############ Plot Proportion of voters in each location category ####
 # voter poll location data
 #poll_data<-read.csv(paste0(data_dir,'\\FVE_',year,'_polllocation_underlying.csv'))
 FVE_poll_data17<-read.csv(paste0(data_dir,'\\FVE_2017_polllocation_underlying.csv'))%>%
@@ -467,8 +577,9 @@ FVE_poll_data_all<-factorize_set_ref(FVE_poll_data_all,'location_category',
 FVE_poll_data_all<-factorize_set_ref(FVE_poll_data_all,'location_category_simpl',
                                  ref_cat = 'other')
 
+#####
 
-##### Plot proportion of registered voters at each category of polling location
+##### Plot proportion of registered voters at each category of polling location ####
 ## manipulate poll data into plotting data
 ###Full set of categories
 FVE_plot_data_full<-FVE_poll_data_all%>%
@@ -519,7 +630,7 @@ ggplot(FVE_plot_data_simpl, aes(x=fct_reorder(location_category_simpl, prop_vote
 
 # Clean up
 rm(FVE_poll_data_all)
-
+#####
 
 ############ Plot Proportion of voters whose polling location Category Changed by County #####
 ### Based on polling location address
@@ -596,6 +707,164 @@ ggplot(FVE_plot_data_county, aes(x=fct_reorder(County, prop_changed_poll_loc), y
 # Clean up
 rm(FVE_poll_data_all)
 
+
+############ Plot Proportion of voters at each location Category for Philly vs. Rest of PA ####
+# Voter poll location data
+data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
+# read in data
+model_data<-read.csv(paste0(data_dir,'/DiD_prepped_poll_vote_16to19_no_rndm_race.csv'))%>%
+  select(all_of(c('LALVOTERID','year','County','location_category')))
+
+## Create dictionary of location labels ####
+loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
+            'other'='Other','relig_loc'='Religious Location','school'='School',
+            'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
+            'library'='Library', 'relig_school'='Religious School',
+            'catholic_school'='Catholic School','catholic_church'='Catholic Church',
+            'cath_loc'='Catholic Location')
+## Create simplified location categories variable ####
+###(subsume catholic into religious)
+model_data<-model_data%>%
+  mutate(location_category_simpl = case_when(
+    location_category=='apartment' ~ 'apartment building',
+    location_category=='public center' ~ 'community center',
+    location_category=='senior center' ~ 'community center',
+    location_category=='public center/senior center' ~ 'community center',
+    location_category=='art center' ~ 'community center',
+    location_category=='post office' ~ 'government',
+    location_category=='government' ~ 'government',
+    #location_category=='government/police' ~ 'government/justice',
+    location_category=='government/police' ~ 'government',
+    location_category=='government/fire' ~ 'government',
+    location_category=='courthouse' ~ 'justice',
+    location_category=='police station' ~ 'justice',
+    location_category=='religious school' ~ 'religious',
+    location_category=='catholic school' ~ 'religious',
+    location_category=='association' ~ 'association/club/sport/union',
+    location_category=='club' ~ 'association/club/sport/union',
+    location_category=='sport' ~ 'association/club/sport/union',
+    location_category=='union' ~ 'association/club/sport/union',
+    location_category=='association/union' ~ 'association/club/sport/union',
+    location_category=='sports association' ~ 'association/club/sport/union',
+    ## Should have been recoded to association earlier...
+    location_category=='event space' ~ 'association/club/sport/union',
+    location_category=='restaurant' ~ 'business',
+    location_category=='nursing home' ~ 'retirement community/nursing home',
+    location_category=='retirement community' ~ 'retirement community/nursing home',
+    # #Grouping military with veteran association buildings
+    #location_category=='military' ~ 'military/veteran',
+    #location_category=='veteran' ~ 'military/veteran',
+    ## Folding in gov/milit too since it's a small category with a large effect
+    location_category=='government/military' ~ 'other',
+    # #Grouping most smaller categories we haven't theorized about together into 'other'
+    location_category=='business' ~ 'other', 
+    location_category=='military' ~ 'other',
+     location_category=='veteran' ~ 'other',
+    # location_category=='association' ~ 'other',
+    # location_category=='club' ~ 'other',
+    # location_category=='sport' ~ 'other',
+    # location_category=='union' ~ 'other',
+    location_category=='insufficient info' ~ 'other',
+    location_category=='stadium' ~ 'other',
+    location_category=='museum' ~ 'other',
+    location_category=='hotel' ~ 'other',
+    location_category=='monument' ~ 'other',
+    location_category=='medical' ~ 'other',
+    location_category=='recreation facility' ~ 'other',
+    location_category=='airport' ~ 'other',
+    location_category=='mobile home park' ~ 'other',
+    location_category=='park' ~ 'other',
+    location_category=='private residence' ~ 'other',
+    location_category=='public/subsidized housing' ~ 'other',
+    # Should have been recategorized to other earlier...
+    location_category=='religious/government' ~ 'other',
+    .default = location_category
+  ))
+model_data<-model_data%>%
+  mutate(location_category_simpl = case_when(
+    location_category=='apartment' ~ 'apartment building',
+    location_category=='public center' ~ 'community center',
+    location_category=='senior center' ~ 'community center',
+    location_category=='public center/senior center' ~ 'community center',
+    location_category=='art center' ~ 'community center',
+    location_category=='post office' ~ 'government',
+    #location_category=='government' ~ 'government',
+    #location_category=='government/police' ~ 'government/justice',
+    location_category=='government/police' ~ 'government',
+    location_category=='government/firestation' ~ 'government',
+    location_category=='courthouse' ~ 'justice',
+    location_category=='police station' ~ 'justice',
+    location_category=='religious school' ~ 'religious',
+    location_category=='catholic school' ~ 'religious',
+    location_category=='association' ~ 'association/club/sport/union',
+    location_category=='club' ~ 'association/club/sport/union',
+    location_category=='sport' ~ 'association/club/sport/union',
+    location_category=='union' ~ 'association/club/sport/union',
+    location_category=='association/union' ~ 'association/club/sport/union',
+    location_category=='sports association' ~ 'association/club/sport/union',
+    ## Should have been recoded to association earlier...
+    location_category=='event space' ~ 'association/club/sport/union',
+    location_category=='nursing home' ~ 'retirement community/nursing home',
+    location_category=='retirement community' ~ 'retirement community/nursing home',
+    # #Grouping military with veteran association buildings
+    #location_category=='military' ~ 'military/veteran',
+    #location_category=='veteran' ~ 'military/veteran',
+    ## Folding in gov/milit too since it's a small category with a large effect
+    location_category=='government/military' ~ 'other',
+    # #Grouping most smaller categories we haven't theorized about together into 'other'
+    location_category=='business' ~ 'other', 
+    location_category=='restaurant' ~ 'other',
+    location_category=='military' ~ 'other',
+    location_category=='veteran' ~ 'other',
+    # location_category=='association' ~ 'other',
+    # location_category=='club' ~ 'other',
+    # location_category=='sport' ~ 'other',
+    # location_category=='union' ~ 'other',
+    location_category=='insufficient info' ~ 'other',
+    location_category=='stadium' ~ 'other',
+    location_category=='museum' ~ 'other',
+    location_category=='hotel' ~ 'other',
+    location_category=='monument' ~ 'other',
+    location_category=='medical' ~ 'other',
+    location_category=='recreation facility' ~ 'other',
+    location_category=='airport' ~ 'other',
+    location_category=='mobile home park' ~ 'other',
+    location_category=='park' ~ 'other',
+    location_category=='private residence' ~ 'other',
+    location_category=='public/subsidized housing' ~ 'other',
+    # Should have been recategorized to other earlier...
+    location_category=='religious/government' ~ 'other',
+    .default = location_category
+  ))
+model_data$location_category_simpl[is.na(model_data$location_category_simpl)]<-'other'
+## Covert to plotting data
+Voter_plot_data<-model_data%>%
+  mutate(County= ifelse(County!='PHILADELPHIA','Rest of PA',County))%>%
+  group_by(year,County,location_category_simpl)%>%
+  summarize(num_voters = n())%>%
+  group_by(year,County)%>%
+  mutate(total_voters=sum(num_voters))%>%
+  ungroup()%>%
+  distinct()%>%
+  mutate(prop_voters=num_voters/total_voters,
+         County = ifelse(County=='PHILADELPHIA','Philadelphia',County))
+## Plot
+Voter_plot_data%>%
+  ggplot(aes(x=fct_reorder(location_category_simpl, prop_voters), y=prop_voters, fill=County))+
+  geom_col(position='dodge')+
+  labs(title=paste0('Percentage of Voters Assigned to Each Polling Location Category \nPhiladelphia vs. Rest of PA'),
+       x='Location Category',
+       y='Percentage of Voters')+
+  theme_minimal()+
+  theme(plot.title = element_text(size = 20),
+        axis.title.x = element_text(size = 15),
+        axis.title.y = element_text(size = 15),
+        axis.text.x = element_text(angle=45, hjust=1, size=12),
+        axis.text.y = element_text(size=12),
+        strip.text = element_text(size=13))+
+  facet_wrap(~year, nrow=3)+
+  scale_y_continuous(labels = scales::percent)
+#####
 
 ############ Plot Proportion of voters whose polling location Category Changed without them moving? #####
 voter_data<-read.csv(paste0(data_dir,'/DiD_prepped_poll_vote_16to19_no_rndm_race.csv'))
@@ -689,4 +958,3 @@ ggplot(plot_data_summ, aes(x=fct_reorder(location_category, prop_voters), y=prop
 
 
 ### Plot proportion of polling locations that changed by urban vs. rural
-
