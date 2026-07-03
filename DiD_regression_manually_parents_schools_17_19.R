@@ -94,7 +94,7 @@ common_covars <-c(
 # model_data$location_category_simpl[model_data$location_category_simpl=='catholic_church']<-'religious'
 # model_data$location_category_simpl[model_data$location_category_simpl=='catholic_school']<-'religious_school'
 
-## set how 'other category is treated
+## set how 'other category is treated (All NA should be coded now we've donme it manually)
 #other_cond='default'
 #other_cond='OtherSettoNA'
 other_cond='NASettoOther'
@@ -168,6 +168,7 @@ two_data<-model_data%>%
 
 
 ######## Generate propensity scores
+######## Matching should only be done on pre-treatment observations (Not the case atm)
 
 ### new poll location without moving after 2018
 # no_chng_or_no_mv_two_data<-two_data%>%
@@ -200,10 +201,7 @@ two_data<-model_data%>%
 # Logistic Regression based scores
 ## Change in polling location without moving
 ## Change in polling location (to a school) without moving
-ps_formula <- parent_new_poll_school ~  Voters_Gender + Voters_Age + Parties_Description+
-  pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
-  known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
-  years_reg+County 
+
 # very few observations (or even zero?) in many counties
 
 ################## Test on parents/schools
@@ -219,7 +217,8 @@ voters_parents_two_data<-two_data%>%
   mutate(
     # Whether new polling location in 2019 is a school
     parent_new_poll_school = ifelse(
-      ((location_category=='school')&(year==2019)),T,F)
+      #((location_category=='school')&(year==2019)),T,F)
+      any((location_category=='school')&(year==2019)),T,F)
   )%>%
   ungroup()%>%
   select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
@@ -290,8 +289,8 @@ voters_parents_two_data<-rbind(voters_parents_two_data_2018, voters_parents_two_
 rm(voters_parents_two_data_2018, voters_parents_two_data_2019)
 ####
 
-# Convert treatment and outcome variable to numeric
-voters_parents_two_data['parent_new_poll_school'] <- sapply(voters_parents_two_data['parent_new_poll_school'],as.numeric)
+# Convert treatment and outcome variable to numeric?
+#voters_parents_two_data['parent_new_poll_school'] <- sapply(voters_parents_two_data['parent_new_poll_school'],as.numeric)
 voters_parents_two_data$voted<-as.numeric(voters_parents_two_data$voted)
 
 
@@ -329,19 +328,81 @@ voters_parents_two_data <- voters_parents_two_data %>%
 rm(voters_parents_two_data_2017)
 
 ######## Save crosstabs of category counts
-test<-voters_parents_two_data%>%
-  group_by(County,parent_new_poll_school)%>%
-  summarize(num=length(unique(LALVOTERID)))%>%
-  pivot_wider(id_cols = County,names_from = parent_new_poll_school,
-              values_from = num)
-
-write.csv(test,paste0(results_dir,'temp.csv'))
+# test<-voters_parents_two_data%>%
+#   group_by(County,parent_new_poll_school)%>%
+#   summarize(num=length(unique(LALVOTERID)))%>%
+#   pivot_wider(id_cols = County,names_from = parent_new_poll_school,
+#               values_from = num)
+# 
+# write.csv(test,paste0(results_dir,'temp.csv'))
 #########
+#Matching and regression forumula
+ps_formula <- parent_new_poll_school ~  Voters_Gender + Voters_Age + Parties_Description+
+  pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+  known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+  years_reg+County 
 
-## Default logistic regression calculated propensity score matching
+## Default nearest neighbor calculated propensity score matching
+### test code, matching just pre-treatment like should have been from the start
+
+# Filter to pre-treatment period only
+pre_data <- voters_parents_two_data%>% 
+  filter(year == 2017)
+
+# Run matching (1:1 nearest neighbor propensity score matching)
+test_match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+summary(test_match_out)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+love.plot(test_match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(test_match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(test_match_out)$LALVOTERID
+test<-match.data(test_match_out)
+matched_panel <- voters_parents_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2018)
+
+
+## t-test comparing outcome in post-treatment period
+t.test(voted ~ parent_new_poll_school, data = matched_panel[matched_panel$year==2019,])
+
+
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+test.fit1 <- glm(voted ~ parent_new_poll_school*factor(year),
+                   data = matched_panel,
+                   family = binomial(link = 'logit'))
+summary(test.fit1)
+
+#binomial model w/ only naturally fixed covariates
+test.fit2 <- glm(voted ~ parent_new_poll_school*factor(year)+Voters_Gender + Parties_Description+
+                   pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                   known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                    +County,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+
+summary(test.fit2)
+
+#binomial model w/ all covariates artificially fixed
+test.fit3 <- glm(voted ~ parent_new_poll_school*factor(year)+Voters_Gender + Voters_Age + Parties_Description+
+                     pred_race+CommercialData_EstimatedHHIncomeAmount+Residence_Families_HHCount+
+                     known_religious+CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                     years_reg +County,
+                   data = matched_panel,
+                   family = binomial(link = 'logit'))
+
+summary(test.fit3)
+
+
 ### no replacement, one control to one treated
 m.logit<-matchit(ps_formula,data=voters_parents_two_data, replace=F)
 summary(m.logit)
+#summary(m.logit, un = FALSE) #don;t show original balance
 # Check balance (default balance is poor (probably small sample size))
 love.plot(m.logit, drop.distance = TRUE)
 ## Convert match object into a dataset
@@ -359,8 +420,10 @@ writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/s
 
 #binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
 parent.fit1 <- glm(voted ~ parent_new_poll_school,
-                   data = logit.match,
+                   data = matched_panel,
                    family = binomial(link = 'logit'),
+                   #technically we don't need to include weights for 1:1 matching w/o replacement
+                   #https://kosukeimai.github.io/MatchIt/articles/MatchIt.html#estimating-the-treatment-effect
                    weights = weights)
 
 summary(parent.fit1)
