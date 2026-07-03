@@ -17,6 +17,21 @@ library(lmtest) # clustered standard errors
 ### Not in function
 '%!in%' <- function(x,y)!('%in%'(x,y))
 
+### TWFE Run and save
+Run_TWFE_and_save_output<-function(formula, data, path, filename){
+  base.fit1 <- glm(
+    formula=formula,
+      data = data,
+      family = binomial(link = 'logit'))
+  summary(base.fit1)
+  ## Clustered standard errors
+  cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+  summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+  print(summary_clustered)
+  chars <- capture.output(print(summary_clustered))
+  writeLines(chars, con = file(paste0(path,filename)))
+}
+
 
 ########################################################### Main
 # set directories ####
@@ -28,7 +43,7 @@ plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots"
 setwd(data_dir)
 model_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
 
-## Recode extraneous parties to 'other'
+## Recode extraneous parties to 'other' ####
 model_data$Parties_Description <- fct_collapse(model_data$Parties_Description, 
                                                Other = c('American', 'American Independent','Anarchist','Bull Moose',
                                                          'Christian','Communist','Conservative','Constitution',
@@ -41,14 +56,17 @@ model_data$Parties_Description <- fct_collapse(model_data$Parties_Description,
                                                          'Social Democrat','Socialist','Socialist Labor',
                                                          'Taxpayers','Unknown','Whig'))
 model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
-## Create vector of location category labels
+#####
+
+## Create vector of location category labels #####
 loc_labels_NAsettoOther<-c('Other','Justice Location','Library','Multiple Categories',
                            'Public Location','Public/Justice Location','Religious Location',
                            'Religious School','School')
 loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
                            'Public Location','Public/Justice Location','Religious Location',
                            'Religious School','School')
-## Create dictionary of location labels
+#####
+## Create dictionary of location labels #####
 loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
             'other'='Other','relig_loc'='Religious Location','school'='School',
             'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
@@ -66,9 +84,9 @@ var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
             'has_child'='Has Child(ren)','known_gov_emp'='Known Government Employee',
             'Parties_Description'='Political Party','pred_race'='Predicted Race',
             'Shape_Length'='Distance to Polling Station','known_catholic'='Known Catholic')
+#####
 
-## Create simplified location categories variable 
-###(subsume catholic into religious)
+### Create simplified location categories variable  ####
 model_data<-model_data%>%
   mutate(location_category_simpl = case_when(
     location_category=='apartment' ~ 'apartment building',
@@ -122,6 +140,8 @@ model_data<-model_data%>%
     .default = location_category
   ))
 
+#####
+
 ## Calculate years registered based on dependent variable year
 model_data$years_reg<-2017-as.numeric(model_data$year_reg)
 
@@ -145,13 +165,12 @@ loc_labels=loc_labels_NAsettoOther
 model_data$location_category[is.na(model_data$location_category)]<-'other'
 model_data$location_category_simpl[is.na(model_data$location_category_simpl)]<-'other'
 
-## Factorize variables
+## Factorize variables ####
 #location categories
 model_data$location_category<-as.factor(model_data$location_category)
 model_data$location_category<-relevel(model_data$location_category, ref='other')
 model_data$location_category_simpl<-as.factor(model_data$location_category_simpl)
 model_data$location_category_simpl<-relevel(model_data$location_category_simpl, ref='other')
-
 #race
 model_data$pred_race <- as.factor(model_data$pred_race)
 model_data$pred_race <- relevel(model_data$pred_race, ref = "pred.whi")
@@ -172,17 +191,14 @@ model_data$CommercialData_OccupationIndustry<-as.factor(model_data$CommercialDat
 model_data$CommercialData_OccupationIndustry<-relevel(model_data$CommercialData_OccupationIndustry, ref='Unknown')
 #####
 
-### Create treatment indicators
+### Create dependent variable 'voted' ####
 two_data<-model_data%>%
   # group by voter
   group_by(LALVOTERID)%>%
-  mutate(ever_changed_poll_loc=(sum(changed_poll_loc)>0),
-         ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
-         ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0)
-         #ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0)
-  )%>% 
-  #create single variable that indicates if someone voted in a given year
-  ## ...or in this case voted in 2017 or 2019
+  # mutate(ever_changed_poll_loc=(sum(changed_poll_loc)>0),
+  #        ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
+  #        ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0)
+  # )%>% 
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
   mutate(voted = ((year==2016 & General_2016_11_08==1)
@@ -196,11 +212,707 @@ two_data<-model_data%>%
   #remove duplicate records (not sure where they came from)
   distinct(LALVOTERID, year, .keep_all = T)
 
-######## Generate propensity scores
+# ####
+
+######## Generate propensity scores ####
 ######## Matching should only be done on pre-treatment observations
+#Matching regression formula####
+ps_formula <- new_poll_treated ~  Voters_Gender + Voters_Age + 
+  Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+  Residence_Families_HHCount+known_religious+
+  CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+  years_reg+County
 
 ### Set location category being tested
 treatment_location='school'
+
+
+### General Tests of Effects of Changing Location
+#### People who changed location vs. people who didn't ####
+#### Just 2017 to 2019 ####
+change_location_two_data<-two_data%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # Whether new polling location in 2019 or not
+    new_poll_treated = ifelse(
+      any((changed_poll_loc>0)&(year==2019)),T,F)
+  )%>%
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'new_poll_treated',
+                  'voted'
+  )))
+
+# Convert treatment and outcome variable to numeric for matching function?
+change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
+
+# Create fixed covariates with 2017 (pre-treatment) values
+## Filter data for year 2017
+change_location_two_data_2017 <- change_location_two_data %>%
+  filter(year == 2017) %>%
+  select(all_of(c('LALVOTERID','County','Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg')))
+## Join back to the original dataset
+change_location_two_data <- change_location_two_data %>%
+  left_join(change_location_two_data_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
+  filter(complete.cases(.))
+# Remove 2017 dataframe
+rm(change_location_two_data_2017)
+
+## Default nearest neighbor calculated propensity score matching ####
+# Filter to pre-treatment period only
+pre_data <- change_location_two_data%>%
+  filter(year == 2017)
+# Run matching (1:1 nearest neighbor propensity score matching, no replacement)
+match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+love.plot(match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(match_out)$LALVOTERID
+matched_panel <- change_location_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2018)
+# Extract cluster/pair ids for robust errors later
+## Matched data object
+match_out_data<-match.data(match_out)
+## voter id and clusterid
+match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
+# Add back into model data
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
+#####
+
+### T-test to examine baseline voting frequency ####
+t_test_data<-matched_panel%>%
+  filter(year==2017)
+t.test(data=t_test_data, voted ~ new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    "new_location_vs_not_matched_t_test_17.txt")))
+t_test_data<-change_location_two_data%>%
+  filter(year==2017)
+t.test(data=t_test_data, voted ~ new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    "new_location_vs_not_all_obs_t_test_17.txt")))
+# ####
+
+############# Run two way fixed effects ##########
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+base.fit1 <- glm(voted ~ new_poll_treated*factor(year),
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit1)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "new_location_vs_not_twfe_covars_cse_17_19_6_7_26.txt")))
+#binomial model w/ covariates
+base.fit2 <- glm(voted ~ new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
+                   Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+                   Residence_Families_HHCount+known_religious+
+                   CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                   years_reg+County,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit2)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit2, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "new_location_vs_not_twfe_covars_cse_17_19_6_7_26.txt")))
+############
+# #####
+
+#### Just 2018 to 2019 ####
+change_location_two_data<-two_data%>%
+  group_by(LALVOTERID)%>%
+  mutate(
+    # Whether new polling location in 2019 or not
+    new_poll_treated = ifelse(
+      any((changed_poll_loc>0)&(year==2019)),T,F)
+  )%>%
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'new_poll_treated',
+                  'voted'
+  )))
+
+# Convert treatment and outcome variable to numeric for matching function?
+change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
+
+# Create fixed covariates with 2018 (pre-treatment) values
+## Filter data for year 2018
+change_location_two_data_2018 <- change_location_two_data %>%
+  filter(year == 2018) %>%
+  select(all_of(c('LALVOTERID','County','Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg')))
+## Join back to the original dataset
+change_location_two_data <- change_location_two_data %>%
+  left_join(change_location_two_data_2018, by = "LALVOTERID", suffix = c("", "_2018"))%>%
+  filter(complete.cases(.))
+# Remove 2018 dataframe
+rm(change_location_two_data_2018)
+
+
+## Default nearest neighbor calculated propensity score matching ####
+# Filter to pre-treatment period only
+pre_data <- change_location_two_data%>%
+  filter(year == 2018)
+# Run matching (1:1 nearest neighbor propensity score matching, no replacement)
+match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+#love.plot(match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(match_out)$LALVOTERID
+matched_panel <- change_location_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2017)
+# Extract cluster/pair ids for robust errors later
+## Matched data object
+match_out_data<-match.data(match_out)
+## voter id and clusterid
+match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
+# Add back into model data
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
+#####
+############# Run two way fixed effects ##########
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+base.fit1 <- glm(voted ~ new_poll_treated*factor(year),
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit1)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "new_location_vs_not_twfe_no_covars_cse_18_19_6_7_26.txt")))
+#binomial model w/ covariates
+base.fit2 <- glm(voted ~ new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
+                   Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+                   Residence_Families_HHCount+known_religious+
+                   CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                   years_reg+County,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit2)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit2, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "new_location_vs_not_twfe_covars_cse_18_19_6_7_26.txt")))
+############
+#####
+
+#### People who moved vs. people who didn't change ####
+#Matching regression formula####
+ps_formula <- moved_new_poll_treated ~  Voters_Gender + Voters_Age + 
+  Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+  Residence_Families_HHCount+known_religious+
+  CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+  years_reg+County
+#### Just 2017 to 2019 ####
+change_location_two_data<-two_data%>%
+  group_by(LALVOTERID)%>%
+  # remove voters who changed location without moving
+  filter(!any((no_move_new_poll_loc==1)&(year==2019)))%>%
+  mutate(
+    # Whether new polling location in 2019 or not
+    moved_new_poll_treated = ifelse(
+      any((moved_new_poll_loc==1)&(year==2019)),T,F)
+  )%>%
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'moved_new_poll_treated',
+                  'voted'
+  )))
+
+# Convert treatment and outcome variable to numeric for matching function?
+change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
+
+# Create fixed covariates with 2017 (pre-treatment) values
+## Filter data for year 2017
+change_location_two_data_2017 <- change_location_two_data %>%
+  filter(year == 2017) %>%
+  select(all_of(c('LALVOTERID','County','Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg')))
+## Join back to the original dataset
+change_location_two_data <- change_location_two_data %>%
+  left_join(change_location_two_data_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
+  filter(complete.cases(.))
+# Remove 2017 dataframe
+rm(change_location_two_data_2017)
+
+## Default nearest neighbor calculated propensity score matching ####
+# Filter to pre-treatment period only
+pre_data <- change_location_two_data%>%
+  filter(year == 2017)
+# Run matching (1:1 nearest neighbor propensity score matching, no replacement)
+match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+#love.plot(match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(match_out)$LALVOTERID
+matched_panel <- change_location_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2018)
+# Extract cluster/pair ids for robust errors later
+## Matched data object
+match_out_data<-match.data(match_out)
+## voter id and clusterid
+match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
+# Add back into model data
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
+#####
+### T-test to examine baseline voting frequency ####
+t_test_data<-matched_panel%>%
+  filter(year==2017)
+t.test(data=t_test_data, voted ~ moved_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ moved_new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    "moved_new_location_vs_not_matched_t_test_17.txt")))
+t_test_data<-change_location_two_data%>%
+  filter(year==2017)
+t.test(data=t_test_data, voted ~ moved_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ moved_new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    "moved_new_location_vs_not_all_obs_t_test_17.txt")))
+# ####
+############# Run two way fixed effects ##########
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+base.fit1 <- glm(voted ~ moved_new_poll_treated*factor(year),
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit1)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "moved_new_location_vs_not_twfe_no_covars_cse_17_19_6_7_26.txt")))
+#binomial model w/ covariates
+base.fit2 <- glm(voted ~ moved_new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
+                   Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+                   Residence_Families_HHCount+known_religious+
+                   CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                   years_reg+County,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit2)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit2, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "moved_new_location_vs_not_twfe_covars_cse_17_19_6_7_26.txt")))
+############
+#####
+#####
+
+#### People who changed without moving vs. People who didn't change ####
+#Matching regression formula####
+ps_formula <- no_move_new_poll_treated ~  Voters_Gender + Voters_Age + 
+  Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+  Residence_Families_HHCount+known_religious+
+  CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+  years_reg+County
+#### Just 2017 to 2019 ####
+change_location_two_data<-two_data%>%
+  group_by(LALVOTERID)%>%
+  # remove voters who changed location by moving
+  filter(!any((moved_new_poll_loc==1)&(year==2019)))%>%
+  mutate(
+    # Whether new polling location in 2019 or not
+    no_move_new_poll_treated = ifelse(
+      any((no_move_new_poll_loc==1)&(year==2019)),T,F)
+  )%>%
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'no_move_new_poll_treated',
+                  'voted'
+  )))
+
+# Convert treatment and outcome variable to numeric for matching function?
+change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
+
+# Create fixed covariates with 2017 (pre-treatment) values
+## Filter data for year 2017
+change_location_two_data_2017 <- change_location_two_data %>%
+  filter(year == 2017) %>%
+  select(all_of(c('LALVOTERID','County','Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg')))
+## Join back to the original dataset
+change_location_two_data <- change_location_two_data %>%
+  left_join(change_location_two_data_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
+  filter(complete.cases(.))
+# Remove 2017 dataframe
+rm(change_location_two_data_2017)
+
+## Default nearest neighbor calculated propensity score matching ####
+# Filter to pre-treatment period only
+pre_data <- change_location_two_data%>%
+  filter(year == 2017)
+# Run matching (1:1 nearest neighbor propensity score matching, no replacement)
+match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+#love.plot(match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(match_out)$LALVOTERID
+matched_panel <- change_location_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2018)
+# Extract cluster/pair ids for robust errors later
+## Matched data object
+match_out_data<-match.data(match_out)
+## voter id and clusterid
+match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
+# Add back into model data
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
+#####
+### T-test to examine baseline voting frequency ####
+t_test_data<-matched_panel%>%
+  filter(year==2017)
+t.test(data=t_test_data, voted ~ no_move_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ no_move_new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    "no_move_new_location_vs_not_matched_t_test_17.txt")))
+t_test_data<-change_location_two_data%>%
+  filter(year==2017)
+t.test(data=t_test_data, voted ~ no_move_new_poll_treated)
+chars <- capture.output(print(t.test(data=t_test_data, voted ~ no_move_new_poll_treated)))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/T tests/",
+                                    "no_move_new_location_vs_not_all_obs_t_test_17.txt")))
+# ####
+############# Run two way fixed effects ##########
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+base.fit1 <- glm(voted ~ no_move_new_poll_treated*factor(year),
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit1)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "no_move_new_location_vs_not_twfe_no_covars_cse_17_19_6_7_26.txt")))
+#binomial model w/ covariates
+base.fit2 <- glm(voted ~ no_move_new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
+                   Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+                   Residence_Families_HHCount+known_religious+
+                   CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                   years_reg+County,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit2)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit2, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "no_move_new_location_vs_not_twfe_covars_cse_17_19_6_7_26.txt")))
+############
+# ####
+
+#### Just 2018 to 2019 ####
+change_location_two_data<-two_data%>%
+  group_by(LALVOTERID)%>%
+  # remove voters who changed location by moving
+  filter(!any((moved_new_poll_loc==1)&(year==2019)))%>%
+  mutate(
+    # Whether new polling location in 2019 or not
+    no_move_new_poll_treated = ifelse(
+      any((no_move_new_poll_loc==1)&(year==2019)),T,F)
+  )%>%
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'no_move_new_poll_treated',
+                  'voted'
+  )))
+
+# Convert treatment and outcome variable to numeric for matching function?
+change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
+
+# Create fixed covariates with 2018 (pre-treatment) values
+## Filter data for year 2018
+change_location_two_data_2018 <- change_location_two_data %>%
+  filter(year == 2018) %>%
+  select(all_of(c('LALVOTERID','County','Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg')))
+## Join back to the original dataset
+change_location_two_data <- change_location_two_data %>%
+  left_join(change_location_two_data_2018, by = "LALVOTERID", suffix = c("", "_2018"))%>%
+  filter(complete.cases(.))
+# Remove 2018 dataframe
+rm(change_location_two_data_2018)
+
+
+## Default nearest neighbor calculated propensity score matching ####
+# Filter to pre-treatment period only
+pre_data <- change_location_two_data%>%
+  filter(year == 2018)
+# Run matching (1:1 nearest neighbor propensity score matching, no replacement)
+match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+#love.plot(match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(match_out)$LALVOTERID
+matched_panel <- change_location_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2017)
+# Extract cluster/pair ids for robust errors later
+## Matched data object
+match_out_data<-match.data(match_out)
+## voter id and clusterid
+match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
+# Add back into model data
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
+#####
+############# Run two way fixed effects ##########
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+base.fit1 <- glm(voted ~ no_move_new_poll_treated*factor(year),
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit1)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "no_move_new_location_vs_not_twfe_no_covars_cse_18_19_6_7_26.txt")))
+#binomial model w/ covariates
+base.fit2 <- glm(voted ~ no_move_new_poll_treated*factor(year)+Voters_Gender + Voters_Age + 
+                   Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+                   Residence_Families_HHCount+known_religious+
+                   CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                   years_reg+County,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit2)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit2, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "no_move_new_location_vs_not_twfe_covars_cse_18_19_6_7_26.txt")))
+############
+#####
+
+#### People who changed without moving vs. People who changed by moving ####
+#Matching regression formula####
+ps_formula <- no_move_new_poll_vs_moved_new_poll ~  Voters_Gender + Voters_Age + 
+  Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+  Residence_Families_HHCount+known_religious+
+  CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+  years_reg+County
+#### Just 2017 to 2019 ####
+change_location_two_data<-two_data%>%
+  group_by(LALVOTERID)%>%
+  # remove voters who didn't change location
+  filter(!any((changed_poll_loc==0)&(year==2019)))%>%
+  mutate(
+    # Whether new polling location in 2019 without moving or not
+    no_move_new_poll_vs_moved_new_poll = ifelse(
+      any((no_move_new_poll_loc==1)&(year==2019)),T,F)
+  )%>%
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County','Voters_Gender', 'Voters_Age', 
+                  'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg',
+                  'no_move_new_poll_vs_moved_new_poll',
+                  'voted'
+  )))
+
+# Convert treatment and outcome variable to numeric for matching function?
+change_location_two_data$voted<-as.numeric(change_location_two_data$voted)
+
+# Create fixed covariates with 2017 (pre-treatment) values
+## Filter data for year 2017
+change_location_two_data_2017 <- change_location_two_data %>%
+  filter(year == 2017) %>%
+  select(all_of(c('LALVOTERID','County','Voters_Gender', 'Voters_Age', 'Parties_Description', 
+                  'pred_race','CommercialData_EstimatedHHIncomeAmount', 
+                  'Residence_Families_HHCount','known_religious', 
+                  'CommercialData_LikelyUnion', 
+                  #'CommercialData_OccupationGroup',
+                  'CommercialData_OccupationIndustry',
+                  'years_reg')))
+## Join back to the original dataset
+change_location_two_data <- change_location_two_data %>%
+  left_join(change_location_two_data_2017, by = "LALVOTERID", suffix = c("", "_2017"))%>%
+  filter(complete.cases(.))
+# Remove 2017 dataframe
+rm(change_location_two_data_2017)
+
+## Default nearest neighbor calculated propensity score matching ####
+# Filter to pre-treatment period only
+pre_data <- change_location_two_data%>%
+  filter(year == 2017)
+# Run matching (1:1 nearest neighbor propensity score matching, no replacement)
+match_out <- matchit(
+  ps_formula,
+  data = pre_data,
+  replace = FALSE
+)
+## Love plot for balance (stars for standardized mean differences (continuous variables are standardized automatically))
+#love.plot(match_out, drop.distance = TRUE, stars = 'std') 
+## alternative plot
+plot(summary(match_out, interactions = F),var.order = "unmatched")
+# Extract matched data and filter full data (pre and post) to matched units only
+matched_ids<-match.data(match_out)$LALVOTERID
+matched_panel <- change_location_two_data%>%
+  filter(LALVOTERID %in% matched_ids,
+         year!=2018)
+# Extract cluster/pair ids for robust errors later
+## Matched data object
+match_out_data<-match.data(match_out)
+## voter id and clusterid
+match_out_data<-select(match_out_data, all_of(c('LALVOTERID','subclass')))
+# Add back into model data
+matched_panel<-left_join(matched_panel,match_out_data,by='LALVOTERID')
+#####
+
+############# Run two way fixed effects ##########
+#binomial model w/o covariates (covariates not necessarily needed if balance is good enough)
+base.fit1 <- glm(voted ~ no_move_new_poll_vs_moved_new_poll*factor(year),
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit1)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit1, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit1, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "no_move_new_location_vs_moved_new_location_twfe_no_covars_cse_17_19_6_7_26.txt")))
+#binomial model w/ covariates
+base.fit2 <- glm(voted ~ no_move_new_poll_vs_moved_new_poll*factor(year)+Voters_Gender + Voters_Age + 
+                   Parties_Description+pred_race+CommercialData_EstimatedHHIncomeAmount+
+                   Residence_Families_HHCount+known_religious+
+                   CommercialData_LikelyUnion+CommercialData_OccupationIndustry+
+                   years_reg+County,
+                 data = matched_panel,
+                 family = binomial(link = 'logit'))
+summary(base.fit2)
+## Clustered standard errors
+cluster_se <- vcovCL(base.fit2, cluster = ~ subclass)
+summary_clustered <- coeftest(base.fit2, vcov = cluster_se)
+print(summary_clustered)
+chars <- capture.output(print(summary_clustered))
+writeLines(chars, con = file(paste0("C:/Users/natha/Desktop/Polling Places DiD/second_submission_diff_in_diffs/TWFE model tests/",
+                                    "no_move_new_location_vs_moved_new_location_twfe_covars_cse_17_19_6_7_26.txt")))
+############
+#####
+
+
 
 ### Parents who changed polling station to chosen category vs. not
 #### Just 2019 ####
@@ -433,7 +1145,7 @@ ps_formula <- new_poll_treated ~  Voters_Gender + Voters_Age +
 ### Set location category being tested
 treatment_location='government/justice'
 
-### Parents who changed polling station to chosen category vs. not
+### People of interest who changed polling station to chosen category vs. not
 #### Just 2019 ####
 voters_two_data<-two_data%>%
   group_by(LALVOTERID)%>%
@@ -441,7 +1153,7 @@ voters_two_data<-two_data%>%
   ## any() means if any row in the group fulfills the condition all rows are kept
   filter(any(no_move_new_poll_loc==T & year==2019))%>%
   mutate(
-    # Whether new polling location in 2019 is a school
+    # Whether new polling location in 2019 is a location of interest
     new_poll_treated = ifelse(
       any((location_category_simpl==treatment_location)&(year==2019)),T,F)
   )%>%
