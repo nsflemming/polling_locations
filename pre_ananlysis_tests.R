@@ -151,7 +151,8 @@ model_data<-model_data%>%
     ever_changed_poll_loc=(sum(changed_poll_loc)>0),
     ever_moved_new_poll_loc=(sum(moved_new_poll_loc)>0),
     ever_no_move_new_poll_loc=(sum(no_move_new_poll_loc)>0),
-    ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0))%>% 
+    #ever_moved_old_poll_loc=(sum(moved_old_poll_loc)>0)
+    )%>% 
   #create single variable that indicates if someone voted in a given year
   group_by(year)%>%
   mutate(voted = ((year==2016 & General_2016_11_08==1)
@@ -197,41 +198,79 @@ model_data<-model_data%>%
 #   )%>%
 #   ungroup()
 ########################### subsets for specific knowledge tests 
-### Parents who changed polling station between 2017 and 2019
-# voters_parents_model_data_post_17_chng<-model_data%>%
-#   # only parents
-#   filter(has_child==T)%>%
-#   group_by(LALVOTERID)%>%
-#   # Only voters who were registered in both 2017 and 2019
-#   filter(any(year == 2017) & any(year == 2019))%>%
-#   # only people who have changed polling location without moving after 2017
-#   ## any() means if any row in the group fulfills the condition all rows are kept
-#   filter(any(no_move_new_poll_loc==T & year>2017))%>%
-#   mutate(
-#     # Whether new polling location (in 2019) is a school
-#     parent_new_poll_school = sum(((location_category=='school')&(year==2019)),
-#                                  na.rm=T)>0
-#   )%>%
-#   ungroup()
-
-### Parents who changed polling station between 2018 and 2019
-#### Poll location guaranteed to be new to the voter in 2019
-voters_parents_model_data_post_18_chng<-model_data%>%
+### Parents who changed polling station to a school vs. not a school
+#### Just 2019
+voters_parents_two_data<-model_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
   # only parents
   filter(has_child==T)%>%
   group_by(LALVOTERID)%>%
-  # Only voters who were registered in both 2017 and 2019
-  filter(any(year == 2017) & any(year == 2019))%>%
-  # only people who have changed polling location without moving after 2018
+  # only people who have changed polling location without moving after 201X
   ## any() means if any row in the group fulfills the condition all rows are kept
-  filter(any(no_move_new_poll_loc==T & year>2018))%>%
+  filter(any(no_move_new_poll_loc==T & year==2019))%>%
   mutate(
-    # Whether new polling location (in 2019) is a school
-    parent_new_poll_school = sum(((location_category=='school')&(year==2019)),
-                                 na.rm=T)>0
+    # Whether new polling location in 2019 is a school
+    parent_new_poll_school = ifelse(
+      ((location_category=='school')&(year==2019)),T,F)
   )%>%
-  ungroup()
+  ungroup()%>%
+  select(all_of(c('LALVOTERID','year','County', 'parent_new_poll_school',
+                  'General_2016_11_08',
+                  'General_2017_11_07','General_2018_11_06','General_2019_11_05',
+                  'voted'
+  )))
+####
 
+#### 2019 or 2018 if they didn't vote in 2018
+# Get 2018 cases
+voters_parents_two_data_2018<-model_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # only parents
+  filter(has_child==T)%>%
+  group_by(LALVOTERID)%>%
+  # only people who have changed polling location without moving after 201X
+  ## any() means if any row in the group fulfills the condition all rows are kept
+  ## People who changed in 2018, but didn't vote in 2018
+  filter(any((no_move_new_poll_loc==1) & (year==2018) & (General_2018_11_06==0)),
+         ##  And didn't change poll location in 2019
+         any((year==2019) & (no_move_new_poll_loc==0) & (moved_new_poll_loc==0)))%>%
+  ungroup()%>%
+  mutate(
+    # Whether got a new polling location in 2018 and it was a school or not 
+    parent_new_poll_school = ifelse(
+      ((location_category=='school')&(year==2018)),T,F)
+  )
+
+# Get 2019 cases
+voters_parents_two_data_2019<-model_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # only parents
+  filter(has_child==T)%>%
+  group_by(LALVOTERID)%>%
+  # only people who have changed polling location without moving after 201X
+  ## any() means if any row in the group fulfills the condition all rows are kept
+  filter(any(no_move_new_poll_loc==1 & year==2019))%>%
+  ungroup()%>%
+  # Whether got a new polling location in 2019 and it was a school or not
+  mutate(parent_new_poll_school = ifelse(
+    ((location_category=='school')&(year==2019)),T,F))
+
+#Combine 2018 and 2019 cases
+voters_parents_two_data<-rbind(voters_parents_two_data_2018, voters_parents_two_data_2019)%>%
+  select(all_of(c('LALVOTERID','year','County',
+                  'parent_new_poll_school','General_2016_11_08',
+                  'General_2017_11_07','General_2018_11_06','General_2019_11_05',
+                  'voted'
+  )))
+rm(voters_parents_two_data_2018, voters_parents_two_data_2019)
+####
+
+# Convert treatment and outcome variable to numeric
+voters_parents_two_data['parent_new_poll_school'] <- sapply(voters_parents_two_data['parent_new_poll_school'],as.numeric)
+voters_parents_two_data$voted<-as.numeric(voters_parents_two_data$voted)
 
 
 ############ Convert treatment indicators to numeric
@@ -257,22 +296,23 @@ voters_parents_model_data_post_18_chng<-model_data%>%
 # voters_parents_model_data_post_17_chng$voted<-
 #   as.numeric(voters_parents_model_data_post_17_chng$voted)
 
-voters_parents_model_data_post_18_chng['parent_new_poll_school'] <- 
-  sapply(voters_parents_model_data_post_18_chng['parent_new_poll_school'],as.numeric)
-voters_parents_model_data_post_18_chng$voted<-
-  as.numeric(voters_parents_model_data_post_18_chng$voted)
+# voters_parents_model_data_post_18_chng['parent_new_poll_school'] <- 
+#   sapply(voters_parents_model_data_post_18_chng['parent_new_poll_school'],as.numeric)
+# voters_parents_model_data_post_18_chng$voted<-
+#   as.numeric(voters_parents_model_data_post_18_chng$voted)
 
 
 ##################### Plot trends
 
 # Parents change to new school vs. change to non-school
 ## calculate turnout for treated and untreated groups
-plot_data<-calc_turnout_treated_control(voters_parents_model_data_post_18_chng, 'parent_new_poll_school')
+plot_data<-calc_turnout_treated_control(voters_parents_two_data, 'parent_new_poll_school')
 
 # Prop test for turnout each year?
-## significant difference between groups for 2017 and 2018, but not 2016 and 2019
+## Sig diff for 2017-2019 (school reduced voting), 2017-2018/19 (school reduced voting)
+## insig diff for 2017-2018 (school reduced voting)
 election_var<-'General_2019_11_05'
-one_year<-voters_parents_model_data_post_18_chng%>%
+one_year<-voters_parents_two_data%>%
   filter(!is.na(election_var))
 successes<-c(sum(one_year[[election_var]][one_year$parent_new_poll_school==0], na.rm=T),
             sum(one_year[[election_var]][one_year$parent_new_poll_school==1], na.rm=T))
@@ -285,10 +325,11 @@ prop.test(successes, trials)
 ggplot(plot_data,aes(x=time_period,y=turnout,colour=parent_new_poll_school)) +
   geom_point(size=2)+
   geom_line(aes(group = parent_new_poll_school), linetype = 2, linewidth=0.75)+
-  geom_vline(xintercept=2018, alpha=0.25)+
+  #geom_vline(xintercept=2018, alpha=0.25)+
   ylab("Turnout") +
   xlab("Year") +
-  ggtitle("Parallel Trends Plot: \nParents Who Changed Polling Location to a \nSchool vs. a Non-School in 2019") +
+  ggtitle("Parallel Trends Plot: \nParents Who Changed Polling Location to a \nSchool vs. a Non-School") +
+  labs(subtitle="(in 2019)")+
   scale_x_continuous(breaks=seq(2016,2019,1))+
   #convert turnout to percentage
   scale_y_continuous(labels = scales::percent)+
@@ -321,40 +362,66 @@ ggplot(plot_data,aes(x=time_period,y=turnout,colour=parent_new_poll_school)) +
 
 
 ######################### Placebo test
+### See if treatment indicator has a significant effect before treatment occurs
 # mini<-model_data%>%
 #   group_by(General_2017_11_07)%>%
 #   slice_sample(n=100000)%>%
 #   ungroup()
 
-# new poll location in 2019 since 2017 without having moved
-## New poll indicator in 2019, but also could have new poll indicator in 2018?
-## Could make sense either way
-### All parents who changed poll location anytime between 2017 and 2019 elections
-### Comparing parents who are voting at a school in 2019 to those voting not at a school
-voters_parents_model_data<-model_data%>%
-  filter(# only parents 
-    has_child==T)%>%
-  group_by(LALVOTERID)%>%
-  # Changed poll location from 2018 to 2019 OR changed poll location from 2017 to 2018
-  filter(any(no_move_new_poll_loc == 1 & year %in% c(2018, 2019)))%>%
-  # Whether new polling location (in 2019) is a school
-  mutate(parent_new_poll_school_2019 = location_category_2019=='school')
-
-### Parents who changed polling station between 2018 and 2019
-#### Poll location guaranteed to be new to the voter in 2019
-voters_parents_model_data_post_18_chng<-model_data%>%
+# new poll location in 2019 since 2017 and no change in between
+voters_parents_two_data<-model_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
   # only parents
   filter(has_child==T)%>%
   group_by(LALVOTERID)%>%
-  # only people who have changed polling location without moving after 2018
+  # only people who have changed polling location without moving after 201X
   ## any() means if any row in the group fulfills the condition all rows are kept
-  filter(any(no_move_new_poll_loc==T & year>2018))%>%
+  filter(any(no_move_new_poll_loc==T & year==2019))%>%
   mutate(
-    # Whether new polling location (in 2019) is a school
-    parent_new_poll_school_2019 = sum(((location_category=='school')&(year==2019)),
-                                 na.rm=T)>0
-  )%>%
-  ungroup()
+    # Whether new polling location in 2019 is a school
+    parent_new_poll_school = ifelse(
+      (any((location_category=='school')&(year==2019))),T,F)
+  )
+
+## New poll indicator in 2019, or 2018 if they didn't vote in 2018 and didn't change location after
+# Get 2018 cases
+voters_parents_two_data_2018<-model_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # only parents
+  filter(has_child==T)%>%
+  group_by(LALVOTERID)%>%
+  # only people who have changed polling location without moving after 201X
+  ## any() means if any row in the group fulfills the condition all rows are kept
+  ## People who changed in 2018, but didn't vote in 2018
+  filter(any((no_move_new_poll_loc==1) & (year==2018) & (General_2018_11_06==0)),
+         ##  And didn't change poll location in 2019
+         any((year==2019) & (no_move_new_poll_loc==0) & (moved_new_poll_loc==0)))%>%
+  mutate(
+    # Whether got a new polling location in 2018 and it was a school or not 
+    parent_new_poll_school = ifelse(
+      any((location_category=='school')&(year==2018)),T,F)
+  )
+
+# Get 2019 cases
+voters_parents_two_data_2019<-model_data%>%
+  # Registered to vote in 2019
+  filter(!is.na(General_2019_11_05))%>%
+  # only parents
+  filter(has_child==T)%>%
+  group_by(LALVOTERID)%>%
+  # only people who have changed polling location without moving after 201X
+  ## any() means if any row in the group fulfills the condition all rows are kept
+  filter(any(no_move_new_poll_loc==1 & year==2019))%>%
+  # Whether got a new polling location in 2019 and it was a school or not
+  mutate(parent_new_poll_school = ifelse(
+    any((location_category=='school')&(year==2019)),T,F))
+
+#Combine 2018 and 2019 cases
+voters_parents_two_data<-rbind(voters_parents_two_data_2018, voters_parents_two_data_2019)
+# Remove single year data frames 
+rm(voters_parents_two_data_2018, voters_parents_two_data_2019)
 
 ### Run regression using treatment indicator as a placebo
 #### See if treatment has significant effect before treatment has occurred
@@ -375,20 +442,25 @@ common_covars <-c(
 ## model variables
 ind_vars_placebo <-c(
   # var of interest
-  'parent_new_poll_school_2019',
+  'parent_new_poll_school',
   common_covars
 )
 
 
-#Data for placebo model (logit regression for 2017 and 2018 comparing people who change after 2018)
+#Data for placebo model (logit regressions for 2017 and 2018 comparing people who change after 2018)
 year_num<-2017
+dep_var = 'General_2017_11_07'
 ## Take only one year to avoid double counting individuals across multiple years
-voters_parents_model_data_single_year<-voters_parents_model_data_post_18_chng%>%
+voters_parents_model_data_single_year<-voters_parents_two_data%>%
   filter(year==year_num)
+## Factorize treatment var
+voters_parents_model_data_single_year$parent_new_poll_school = factor(voters_parents_model_data_single_year$parent_new_poll_school)
+## Calculate mean turnout for plotting
+mean_turnout <- mean(voters_parents_model_data_single_year[[dep_var]], na.rm=T)
 ## Calculate years registered based on dependent variable year
 voters_parents_model_data_single_year$years_reg<-year_num-as.numeric(voters_parents_model_data_single_year$year_reg)
 ## Recode extraneous parties to 'other'
-model_data$Parties_Description <- fct_collapse(model_data$Parties_Description, 
+voters_parents_model_data_single_year$Parties_Description <- fct_collapse(voters_parents_model_data_single_year$Parties_Description, 
                                                Other = c('American', 'American Independent','Anarchist','Bull Moose',
                                                          'Christian','Communist','Conservative','Constitution',
                                                          'Constitutional','Consumer','Federalist','Free Choice',
@@ -399,26 +471,30 @@ model_data$Parties_Description <- fct_collapse(model_data$Parties_Description,
                                                          'Reform','Registered Independent','Right to Life',
                                                          'Social Democrat','Socialist','Socialist Labor',
                                                          'Taxpayers','Unknown','Whig'))
-model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
-
+voters_parents_model_data_single_year$Parties_Description <- relevel(voters_parents_model_data_single_year$Parties_Description, ref = "Democratic")
+## Factorize religious variable
+voters_parents_model_data_single_year$known_religious<-as.factor(voters_parents_model_data_single_year$known_religious)
 
 
 # model
-m_placebo<-log_reg(voters_parents_model_data_single_year, 
-                   'General_2018_11_06', ind_vars_placebo)
+m_placebo<-log_reg(voters_parents_model_data_single_year, dep_var, 
+                   ind_vars_placebo)
 summary(m_placebo)
 #save results
-write_summ(results_dir, paste0('placebo_',year_num,'_parents_new_poll_school'), m_placebo)
+write_summ(results_dir, paste0('placebo_',year_num,'_parents_new_poll_school_19'), m_placebo)
 ## Calculate and plot predicted probabilities
-placebo_pred<-predict_response(m_placebo, terms=c('parent_new_poll_school_2019'), margin='marginalmeans')
+placebo_pred<-predict_response(m_placebo, terms=c('parent_new_poll_school'), margin='marginalmeans')
 #plot predicted probabilities
-pred_prob_plot(model_data=model_data, dep_var=dep_var, placebo_pred, mean_vote = mean_turnout,
-               plot_title = paste0(year,' Probability of Voting of Parents at New (Non-)School Locations'),
-               #xlab='Has a Child/Children', 
+vers='3_16_26'
+pred_prob_plot(model_data=voters_parents_model_data_single_year, dep_var=dep_var, placebo_pred, mean_vote = mean_turnout,
+               plot_title = paste0(year_num,' Placebo Effect of Voting at a School'),
+               xlab='xaxis', 
                #x_axis_labels = c('FALSE', 'TRUE'),
                legend_exist=T, legend_title ='', angle=0,legend_position = 'right',
                output_dir = plot_dir, 
-               image_name = paste0('Placebo_Pred_Prob_Parent_School',year,'_',vers,'_',other_cond))
+               image_name = paste0('Placebo_Pred_Prob_Parent_School_19_',year_num,'_',vers))
+
+
 
 
 
