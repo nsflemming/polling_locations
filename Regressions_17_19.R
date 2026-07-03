@@ -15,8 +15,9 @@ library(margins) # get average marginal effects
 library(ggeffects) #plot predicted probabilities
 library(dplyr)
 library(clubSandwich) # Cluster robust standard errors (clustered standard errors)
+library(lmtest) #likelihood ratio test for interaction effect significance
 
-########## Functions
+########## Functions ####
 
 ## Binarize vote variables
 binarize_vote <- function(data, vote_var, yes_vote_value){
@@ -87,7 +88,7 @@ log_reg_inter<-function(df,dep_var='General_2018_11_06', interaction_terms,
   }
 }
 
-## Logistic regressions for a list of interactions plus plotting predicted probabilities
+## Logistic regressions for a list of interactions plus plotting predicted probabilities ####
 log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_terms, 
                                   ind_vars=c('Voters_Gender', 'Voters_Age',
                                              'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
@@ -125,8 +126,9 @@ log_reg_inter_plus_plot<-function(df,dep_var='General_2018_11_06', interaction_t
                    output_dir=image_dir, image_name=image_name)
   }
 }
+#####
 
-## Logistic regressions for a list of interactions + marginal effects
+## Logistic regressions for a list of interactions + marginal effects ####
 log_reg_inter_plus_margins<-function(df,dep_var='General_2018_11_06', interaction_terms, 
                                      ind_vars=c('Voters_Gender', 'Voters_Age',
                                                 'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
@@ -150,14 +152,16 @@ log_reg_inter_plus_margins<-function(df,dep_var='General_2018_11_06', interactio
     write_summ(results_dir, paste0(substr(interaction,1,11),'x',substr(interaction,13,100),'_AMEsummary'), model)
   }
 }
+#####
 
-#plot predicted probabilities
+#plot predicted probabilities ####
 pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, mean_vote,
                          plot_title, 
                          xlab, #x_axis_labels, 
                          ylab='Predicted Probability of Voting',
                          legend_exist=TRUE, legend_title, angle=0, 
-                         hjust_value=0, vjust_value=0,
+                         hjust_value=0.5, 
+                         vjust_value=0,
                          legend_position='right', output_dir, image_name){
   g<-ggplot(pred_probs_obj, aes(x, predicted, color=group))+
     geom_point(size=3, position=position_dodge(dodge), show.legend = legend_exist)+
@@ -186,8 +190,81 @@ pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, mean_vo
   setwd(output_dir)
   ggsave(file=paste0(image_name,'.png'), device='png', width=3000, height=2000, units='px', g) #saves g
 }
+#####
 
-#blank plot predicted probabilities
+#plot CIs around interaction's marginal effects ####
+
+interact_CI_plot<-function(model_obj, coef1_var_loc, coef2_var_loc, interact_var_loc,
+                           var1_labels = c('label missing','label missing','label missing'),
+                         plot_title = 'missing plot title', 
+                         xlab = '', x_axis_labels = c('x=1,z=0','x=0,z=1','x=1,z=1'), 
+                         ylab='Effect on Log Odds of Voting',
+                         legend_exist=TRUE, legend_title='missing legend title',
+                         legend_position='right'){
+  ### Calculate standard error at each value of Z (retirement home voting)
+  # Effect of X at z = 0 and z = 1
+  # estimated variance around that effect at that value of Z (V(Δy/Δx))
+  #	The t-statistic for testing whether this estimate is distinguishable from 0 
+  #  is found by dividing the estimated effect Δy/Δx by the estimated standard error 
+  #  of Δy/Δx and evaluating the result against the t-distribution with n-k degrees 
+  #  of freedom (n observations, k regressors)
+  ## Covariance of the coefficient estimates
+  cov_matrix<-vcov(model_obj)
+  covar = cov_matrix[interact_var_loc,coef1_var_loc]
+  ## Variance of the coefficient estimates
+  coef1_var = cov_matrix[coef1_var_loc,coef1_var_loc]
+  coef2_var = cov_matrix[coef2_var_loc,coef2_var_loc]
+  interact_var = cov_matrix[interact_var_loc,interact_var_loc]
+  
+  ##Compute confidence interval on marginal effect
+  ### Variance at x=0, Z = 1 (e.g. not elderly, retirement home)
+  coef2_std_err = sqrt(coef2_var)
+  ### Variance at Z = 0 (e.g. not retirement home)
+  coef1_std_err = sqrt(coef1_var)
+  ### Variance at Z = 1 (e.g. elderly, retirement home)
+  var_z1 = coef1_var+(1^2)*interact_var+2*1*covar
+  std_errz1 = sqrt(var_z1)
+  
+  #Plot CI around effects
+  ## Order effects
+  xs<-c(1,2,3)
+  ##Variable values (e.g. '<65 Yrs Old','65 Yrs Old','65 Yrs Old')
+  zs<-var1_labels
+  ## Effect estimates
+  effects<-c(model_obj$coefficients[[coef2_var_loc]],
+             model_obj$coefficients[[coef1_var_loc]],
+             model_obj$coefficients[[interact_var_loc]])
+  conf.low<-c(model_obj$coefficients[[coef2_var_loc]]-1.96*coef2_std_err,
+              model_obj$coefficients[[coef1_var_loc]]-1.96*coef1_std_err,
+              model_obj$coefficients[[interact_var_loc]]-1.96*std_errz1)
+  conf.high<-c(model_obj$coefficients[[coef2_var_loc]]+1.96*coef2_std_err,
+               model_obj$coefficients[[coef1_var_loc]]+1.96*coef1_std_err,
+               model_obj$coefficients[[interact_var_loc]]+1.96*std_errz1)
+  interact_plot<-data.frame(cbind(xs,zs,as.numeric(effects),as.numeric(conf.low),as.numeric(conf.high)))
+
+g<-ggplot(interact_plot, aes(x=as.factor(xs), y=effects, color=as.factor(zs)))+
+    geom_point(size=3)+
+    geom_errorbar(aes(ymin = conf.low, ymax = conf.high),
+                  width=0.2, linewidth=1)+
+    labs(title = plot_title,
+         x = xlab,
+         y = ylab) +
+    scale_color_discrete(name = legend_title)+
+    scale_x_discrete(labels= x_axis_labels)+
+    theme(plot.title = element_text(size=20, face='bold'),
+          axis.title = element_text(size=15),
+          axis.text.y = element_text(size=17),
+          # axis.text.x = element_text(size=15, angle=angle,hjust = hjust_value,
+          #                            vjust = vjust_value),
+          legend.title = element_text(size=20),
+          legend.text = element_text(size=15),
+          legend.key.size = unit(1, 'cm'),
+          legend.position = legend_position)
+return(g)
+}
+#####
+  
+#blank plot predicted probabilities ####
 blank_pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, mean_vote,
                                xmin,xmax,ymin,ymax,
                                plot_title, 
@@ -216,7 +293,7 @@ blank_pred_prob_plot<-function(model_data, dep_var, pred_probs_obj, dodge=0.8, m
   setwd(output_dir)
   ggsave(file=paste0(image_name,'.png'), device='png', width=3000, height=2000, units='px', g) #saves g
 }
-
+#####
 ########################################################### Main
 # set directories
 data_dir <- "C:/Users/natha/Desktop/Polling Places DiD/data"
@@ -227,14 +304,10 @@ plot_dir <- "C:/Users/natha/Desktop/Polling Places DiD/plots/second_submission_l
 # read in data
 setwd(data_dir)
 raw_data<-read.csv('DiD_prepped_poll_vote_16to19_no_rndm_race.csv')
-### Subsample for testing
-# model_data<-raw_data%>%
-#   sample_n(500000)
-model_data<-raw_data
-#set vers
-vers='V1'
 
-## Recode extraneous parties to 'other'
+
+
+## Recode extraneous parties to 'other' ####
 model_data$Parties_Description <- fct_collapse(model_data$Parties_Description, 
                                                Other = c('American', 'American Independent','Anarchist','Bull Moose',
                                                          'Christian','Communist','Conservative','Constitution',
@@ -247,7 +320,7 @@ model_data$Parties_Description <- fct_collapse(model_data$Parties_Description,
                                                          'Social Democrat','Socialist','Socialist Labor',
                                                          'Taxpayers','Unknown','Whig'))
 model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = "Democratic")
-
+#####
 ## create vector of location categories
 #categories<-c('pub_loc','pub_just','other','relig_loc','school','multiple',
 #              'justice_loc','library','relig_school')
@@ -258,7 +331,7 @@ model_data$Parties_Description <- relevel(model_data$Parties_Description, ref = 
 #loc_labels_OthersettoNA<-c('Multiple Categories','Justice Location','Library',
 #                           'Public Location','Public/Justice Location','Religious Location',
 #                           'Religious School','School')
-## Create dictionary of location labels
+## Create dictionary of location labels ####
 loc_dict<-c('pub_loc'='Public Location','pub_just'='Public and Justice Location',
             'other'='Other','relig_loc'='Religious Location','school'='School',
             'multiple'='Multiple Categories', 'justice_loc'='Justice Location',
@@ -276,16 +349,20 @@ var_dict<-c('Voters_Gender'='Gender', 'Voters_Age'='Age',
             'has_child'='Has Child(ren)','known_gov_emp'='Known Government Employee',
             'Parties_Description'='Political Party','pred_race'='Predicted Race',
             'Shape_Length'='Distance to Polling Station','known_catholic'='Known Catholic')
-
+#####
 
 #################### Logistic Regression
 ##set dependent variable
 #dep_var = 'General_2017_11_07'
-#dep_var = 'General_2018_11_06'
-dep_var = 'General_2019_11_05'
+dep_var = 'General_2018_11_06'
+#dep_var = 'General_2019_11_05'
 year=substr(dep_var,9,12)
 year_num<-as.numeric(year)
 ### Filter to one year and calculate overall mean turnout for election for plotting
+### Subsample for testing
+# model_data<-raw_data%>%
+#   sample_n(500000)
+model_data<-raw_data
 model_data<-model_data[model_data$year==year_num,]
 model_data[[dep_var]][is.na(model_data[[dep_var]])]<-0
 mean_turnout <- mean(model_data[[dep_var]], na.rm=T)
@@ -293,7 +370,7 @@ mean_turnout <- mean(model_data[[dep_var]], na.rm=T)
 ## Calculate years registered based on dependent variable year
 model_data$years_reg<-year_num-as.numeric(model_data$year_reg)
 
-## Common set of covariates
+## Common set of covariates ####
 common_covars <-c(
   # Demographics
   'Voters_Gender', 'Voters_Age', 'Parties_Description',
@@ -306,7 +383,21 @@ common_covars <-c(
   'Shape_Length',
   'years_reg'
 )
-## Create simplified location categories variable 
+common_covars_no_age <-c(
+  # Demographics
+  'Voters_Gender', 'Parties_Description',
+  'pred_race',
+  'CommercialData_EstimatedHHIncomeAmount','Residence_Families_HHCount',
+  'known_religious','CommercialData_LikelyUnion', 
+  #'CommercialData_OccupationGroup',
+  'CommercialData_OccupationIndustry',
+  # Other
+  'Shape_Length',
+  'years_reg'
+)
+#####
+
+## Create simplified location categories variable ####
 ###(subsume catholic into religious)
 model_data<-model_data%>%
   mutate(location_category_simpl = case_when(
@@ -360,12 +451,12 @@ model_data<-model_data%>%
     location_category=='religious/government' ~ 'other',
     .default = location_category
   ))
-
+#####
 
 # location category frequencies
-loc_freq<-model_data%>%
-  group_by(location_category_simpl)%>%
-  summarise(n=n())
+# loc_freq<-model_data%>%
+#   group_by(location_category_simpl)%>%
+#   summarise(n=n())
 
 ## set how 'other category is treated
 #other_cond='OtherSettoNA'
@@ -432,13 +523,15 @@ ind_vars_loc<-c('location_category_simpl','County',common_covars)
 #   group_by('General_2017_11_07')%>%
 #   slice_sample(n=10000)%>%
 #   ungroup()
-m_base_mini_test<-log_reg(model_data, dep_var, ind_vars_loc)
-summary(m_base_mini_test)
+
+# m_base_mini_test<-log_reg(model_data, dep_var, ind_vars_loc)
+# summary(m_base_mini_test)
 
 #save results
 # set vers
 vers='complete_loc_coding_govmilit_as_milit'
 #write_summ(results_dir, paste0('test_base_simpl',year,'_',vers,'_',other_cond), m_base_mini_test)
+
 
 
 ##### Probability of Voting, Location category as predictor for individual counties
@@ -464,16 +557,16 @@ vers='complete_loc_coding_govmilit_as_milit'
 #   over the factor levels. Should come closer to sample 'average observation' 
 # base_pred<-predict_response(m_base_test, terms='location_category_simpl', margin='marginalmeans',
 #                             rg.limit = 12000)
-base_pred<-predict_response(m_base_mini_test, terms='location_category_simpl', margin='marginalmeans',
-                            rg.limit = 3360720)
-#plot predicted probabilities
-pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean_turnout,
-               plot_title = paste0(year,' Probability of Voting at Each Category of Location'),
-               dodge=0, xlab='Location Category', #x_axis_labels = loc_labels,
-               legend_exist=F,legend_title =NULL, angle=45, hjust_value=1, 
-               vjust_value=1,
-               legend_position = 'right', output_dir = plot_dir, 
-               image_name = paste0('Pred_Prob_Location_categories_simpl',year,'_',vers,'_',other_cond))
+# base_pred<-predict_response(m_base_mini_test, terms='location_category_simpl', margin='marginalmeans',
+#                             rg.limit = 3360720)
+# #plot predicted probabilities
+# pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean_turnout,
+#                plot_title = paste0(year,' Probability of Voting at Each Category of Location'),
+#                dodge=0, xlab='Location Category', #x_axis_labels = loc_labels,
+#                legend_exist=F,legend_title =NULL, angle=45, hjust_value=1, 
+#                vjust_value=1,
+#                legend_position = 'right', output_dir = plot_dir, 
+#                image_name = paste0('Pred_Prob_Location_categories_simpl',year,'_',vers,'_',other_cond))
 # create blank plot
 # blank_pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean_turnout,
 #                      ymin=31.5,ymax=37,
@@ -484,7 +577,10 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, base_pred, mean_vote=mean
 #                      legend_position = 'right', output_dir = plot_dir, 
 #                      image_name = paste0('Pred_Prob_Location_categories_',year,'_',vers,'_blank_',other_cond))
 
+
 ##### Probability of Voting, If has/lacks child and is voting at a school
+vers='parent_school'
+other_cond<-'5_21_26'
 #vars
 ## create school dummy
 model_data$school <- model_data$location_category=='school' 
@@ -505,9 +601,27 @@ summary(m_schl)
 #                              coefs=c('has_childTRUE','schoolTRUE','has_childTRUE:schoolTRUE'))
 
 #save results
-write_summ(results_dir, paste0('school_',year,'_',vers,'_',other_cond), m_schl)
+# write_summ(results_dir, paste0('school_',year,'_',vers,'_',other_cond), m_schl)
+
+## Calculate and plot CIs around interaction/main effects
+g<-interact_CI_plot(m_schl, 2, 3, length(m_schl$coefficients),
+                    var1_labels = c('No Child','Has Child','Has Child'),
+                    plot_title = paste0('Effects of Being a (Non-)Parent & \nVoting at a School in ',year), 
+                    xlab = '', x_axis_labels = c('Not Parent/School','Parent/Other','Parent/School'), 
+                    ylab='Effect on Log Odds of Voting',
+                    legend_exist=TRUE, legend_title='Has a Child/Children',
+                    legend_position='right')
+g
+image_name = paste0('effect_parent_school_',year,'_',vers,'_',other_cond)
+#ggsave(file=paste0(plot_dir,'/',image_name,'.png'), device='png', width=3000, height=2000, units='px', g)
+
 ## Calculate and plot predicted probabilities
-schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='marginalmeans')
+other_cond<-'Final_Check_5_21_26'
+### 'marginal means': non-focal predictors are set to their mean or averaged over levels for factors 
+###   to get a weighted average for the values at which factors are held constant.
+###   Generates predictions closer to the sample. Answers 'what is the expected 
+###   value of the response at meaningful levels of my focal terms for an 'average' observation in my data?'E
+schl_pred<-predict_response(m_schl, terms=c('has_child','school'), margin='marginalmeans',rg.limit = 122000)
 #plot predicted probabilities
 pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = mean_turnout,
                plot_title = paste0(year,' Probability of Voting of (Non-)Parents at School Locations'),
@@ -524,6 +638,7 @@ pred_prob_plot(model_data=model_data, dep_var=dep_var, schl_pred, mean_vote = me
 #                      legend_exist=T,legend_title ='Votes at a School', angle=0, 
 #                      legend_position = 'right', output_dir = plot_dir, 
 #                      image_name = paste0('Pred_Prob_child_school_',year,'_',vers,'_blank_',other_cond))
+
 
 
 ##### Probability of Voting, If has/lacks child and is voting at a school and it's a new polling location for them
@@ -554,11 +669,85 @@ pred_prob_plot(model_data=model_data_new_loc, dep_var=dep_var, schl_pred_new, me
                legend_exist=T, legend_title ='Votes at a School', angle=0,legend_position = 'right',
                output_dir = plot_dir, 
                image_name = paste0('Pred_Prob_child_school_new_loc_',year,'_',vers,'_',other_cond))
-# create blank plot
 
 
 
+##### Probability of voting for age 65+ in voting in retirement/nursing home and not
+#set vers
+vers='V_elderly_test'
+## create retirement home dummy
+model_data$retircomm_nurshom <- model_data$location_category=='retirement community/nursing home' 
+model_data$retircomm_nurshom <- as.factor(model_data$retircomm_nurshom)
+# Create elderly dummy
+elderly_data<-model_data%>%
+  mutate(elderly = as.factor(Voters_Age>64))
+# Calculate mean turnout
+mean_turnout <- mean(elderly_data[[dep_var]], na.rm=T)
+## interaction (remove age as a covariate?)
+ind_vars_elder_retir <-c(
+  # var of interest
+  'elderly*retircomm_nurshom',
+  common_covars_no_age
+)
+# model
+m_elder_new<-log_reg(elderly_data, dep_var, ind_vars_elder_retir)
+summary(m_elder_new)
 
+# ## likelihood ratio test (joing f-test equivalent for binomial regression?)
+# ##    for interaction term significance
+# ### Create reduced model without interaction effect
+# reduced_vars_elder_retir <-c(
+#   # var of interest
+#   'elderly+retircomm_nurshom',
+#   common_covars_no_age
+# )
+# m_elder_new_reduced<-log_reg(elderly_data, dep_var, reduced_vars_elder_retir)
+# ### Likelihood test comparing models (whether added interaction effect has a significant impact)
+# lrtest(m_elder_new_reduced, m_elder_new)
+# # setwd(results_dir)
+# # sink(file=paste0('LRTest_elder_retire-nursing',year,'_',vers,'_',other_cond,".txt"))
+# # print(lrtest(m_elder_new_reduced, m_elder_new))
+# # sink()
+
+#save results
+other_cond<-'no_age_covar'
+#write_summ(results_dir, paste0('elder_retire-nursing',year,'_',vers,'_',other_cond), m_elder_new)
+
+g<-interact_CI_plot(m_elder_new, 2, 3, 35,
+                           var1_labels = c('<65 Yrs Old','65 Yrs Old','65 Yrs Old'),
+                           plot_title = paste0('Effects of Being Elderly & Voting \nat a Retirement/Nursing Home in ',year), 
+                           xlab = '', x_axis_labels = c('Not Elderly/Retirement Home','Elderly/Other','Elderly/Retirement Home'), 
+                           ylab='Effect on Log Odds of Voting',
+                           legend_exist=TRUE, legend_title='Age Group',
+                           legend_position='right')
+image_name = paste0('effect_elderly_retire_',year,'_',vers,'_',other_cond)
+ggsave(file=paste0(plot_dir,'/',image_name,'.png'), device='png', width=3000, height=2000, units='px', g)
+## Calculate and plot predicted probabilities
+elder_pred_new<-predict_response(m_elder_new, terms=c('elderly','retircomm_nurshom'), margin='marginalmeans'
+                                 ,rg.limit = 122000
+                                 )
+#plot predicted probabilities
+pred_prob_plot(model_data=elderly_data, dep_var=dep_var, elder_pred_new, mean_vote = mean_turnout,
+               plot_title = paste0(year,' Probability of Voting of (Non-)Elderly at \nRetirement Communities and Nursing Homes'),
+               xlab='65+', 
+               #x_axis_labels = c('FALSE', 'TRUE'),
+               legend_exist=T, legend_title ='Votes at a Retirement Community/Nursing Home', angle=0,legend_position = 'right',
+               output_dir = plot_dir, 
+               image_name = paste0('Pred_Prob_elder_retire_',year,'_',vers,'_',other_cond))
+
+# Distribution of polling locations for elderly voters vs. non-elderly
+temp<-elderly_data%>%
+  group_by(elderly)%>%
+  mutate(num_voters=n())%>%
+  ungroup()%>%
+  group_by(elderly, location_category_simpl)%>%
+  reframe(prop_voters = n()/num_voters)%>%
+  distinct()%>%
+  filter(complete.cases(.))
+
+ggplot(temp, aes(x=location_category_simpl, y=prop_voters,fill=elderly))+
+  geom_col(position='dodge')+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 ###### random code for troubleshooting
 #geocoded<-read.csv('C:/Users/natha/Desktop/Polling Places DiD/data/gov_poll_places geocoded/geocoderesult_2017_poll_locations_10000.csv')
